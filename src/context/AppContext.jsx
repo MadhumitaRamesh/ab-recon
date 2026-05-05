@@ -47,6 +47,16 @@ export const AppProvider = ({ children }) => {
     { id: 3, name: 'DigiGold', frequency: 'Weekly', type: 'API-based', sources: '2-Way', status: 'Active' },
   ]);
 
+  // Notifications State
+  const [notifications, setNotifications] = useState([
+    { id: 1, title: 'Recon Run Success', message: 'BBPS Daily run completed with 12 exceptions.', time: '2h ago', read: false },
+    { id: 2, title: 'Permission Update', message: 'Admin role modified module access grid.', time: '5h ago', read: true },
+    { id: 3, title: 'System Alert', message: 'API Gateway latency is higher than normal.', time: '1d ago', read: true },
+  ]);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   const login = (userData) => {
     setUser(userData);
     localStorage.setItem('ab_recon_user', JSON.stringify(userData));
@@ -66,6 +76,14 @@ export const AppProvider = ({ children }) => {
     setMasters([...masters, { ...master, id: Date.now() }]);
   };
 
+  const addNotification = (notif) => {
+    setNotifications([{ ...notif, id: Date.now(), read: false, time: 'Just now' }, ...notifications]);
+  };
+
+  const markAllAsRead = () => {
+    setNotifications(notifications.map(n => ({ ...n, read: true })));
+  };
+
   return (
     <AppContext.Provider value={{
       user, setUser,
@@ -73,6 +91,9 @@ export const AppProvider = ({ children }) => {
       roles, setRoles,
       permissions, updatePermissions,
       masters, addMaster,
+      notifications, addNotification, markAllAsRead,
+      searchQuery, setSearchQuery,
+      sidebarOpen, setSidebarOpen,
       login, logout,
       modules
     }}>

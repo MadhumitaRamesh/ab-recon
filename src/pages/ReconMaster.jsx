@@ -16,7 +16,7 @@ const ReconMaster = () => {
 
   return (
     <div className="main-content">
-      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+      <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h1 style={{ fontSize: '24px', color: '#0F172A' }}>Reconciliation Master Records</h1>
           <p style={{ color: '#64748B', fontSize: '14px', marginTop: '4px' }}>Define data sources, matching frequency, and processing modes for reconciliation products.</p>
@@ -30,7 +30,7 @@ const ReconMaster = () => {
         <div className="card animate-fade-in" style={{ marginBottom: '32px', maxWidth: '800px', borderTop: '4px solid var(--primary)' }}>
           <h3 style={{ fontSize: '18px', marginBottom: '24px' }}>New Reconciliation Product Configuration</h3>
           <form onSubmit={handleAdd}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '24px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '24px' }}>
               <div className="form-group">
                 <label className="form-label">Product Name</label>
                 <input type="text" className="form-control" placeholder="e.g. BBPS Settlement" value={newMaster.name} onChange={(e) => setNewMaster({...newMaster, name: e.target.value})} required />
@@ -54,47 +54,49 @@ const ReconMaster = () => {
                 </select>
               </div>
             </div>
-            <div style={{ display: 'flex', gap: '12px' }}>
-              <button type="submit" className="btn btn-primary">Initialize Master</button>
-              <button type="button" className="btn btn-outline" onClick={() => setShowForm(false)}>Cancel</button>
+            <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+              <button type="submit" className="btn btn-primary" style={{ flex: '1 1 auto', minWidth: '150px' }}>Initialize Master</button>
+              <button type="button" className="btn btn-outline" style={{ flex: '1 1 auto', minWidth: '150px' }} onClick={() => setShowForm(false)}>Cancel</button>
             </div>
           </form>
         </div>
       )}
 
-      <div className="card" style={{ padding: '0' }}>
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>ID</th>
-              <th>Product Configuration</th>
-              <th>Processing</th>
-              <th>Structure</th>
-              <th>Status</th>
-              <th>Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {masters.map(m => (
-              <tr key={m.id}>
-                <td style={{ color: '#64748B', fontWeight: '500', fontSize: '12px' }}>M-00{m.id}</td>
-                <td>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <Database size={14} color="var(--primary)" />
-                    <div>
-                      <div style={{ fontWeight: '600' }}>{m.name}</div>
-                      <div style={{ fontSize: '11px', color: '#64748B' }}>Freq: {m.frequency}</div>
-                    </div>
-                  </div>
-                </td>
-                <td><div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Settings2 size={14} color="#64748B" /><span>{m.type}</span></div></td>
-                <td><div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><FileCode size={14} color="#64748B" /><span>{m.sources}</span></div></td>
-                <td><span className={`status-pill ${m.status === 'Active' ? 'status-success' : 'status-danger'}`}>{m.status}</span></td>
-                <td><div style={{ display: 'flex', gap: '12px' }}><Edit3 size={16} color="#64748B" /><Trash2 size={16} color="#DC2626" /></div></td>
+      <div className="card" style={{ padding: '0', overflowX: 'auto' }}>
+        <div style={{ minWidth: '800px' }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>Product Configuration</th>
+                <th>Processing</th>
+                <th>Structure</th>
+                <th>Status</th>
+                <th>Actions</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {masters.map(m => (
+                <tr key={m.id}>
+                  <td style={{ color: '#64748B', fontWeight: '500', fontSize: '12px' }}>M-00{m.id}</td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <Database size={14} color="var(--primary)" />
+                      <div>
+                        <div style={{ fontWeight: '600' }}>{m.name}</div>
+                        <div style={{ fontSize: '11px', color: '#64748B' }}>Freq: {m.frequency}</div>
+                      </div>
+                    </div>
+                  </td>
+                  <td><div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Settings2 size={14} color="#64748B" /><span>{m.type}</span></div></td>
+                  <td><div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><FileCode size={14} color="#64748B" /><span>{m.sources}</span></div></td>
+                  <td><span className={`status-pill ${m.status === 'Active' ? 'status-success' : 'status-danger'}`}>{m.status}</span></td>
+                  <td><div style={{ display: 'flex', gap: '12px' }}><Edit3 size={16} color="#64748B" /><Trash2 size={16} color="#DC2626" /></div></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

@@ -36,7 +36,7 @@ const RunRecon = () => {
         <p style={{ color: '#64748B', fontSize: '14px', marginTop: '4px' }}>Trigger manual batches and monitor real-time processing logs.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1.5fr', gap: '24px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '24px' }} className="run-grid">
         <div className="card">
           <h3 style={{ fontSize: '16px', marginBottom: '24px' }}>Configuration</h3>
           <div className="form-group">
