@@ -11,7 +11,9 @@ const ReconMaster = () => {
   const handleAdd = (e) => {
     e.preventDefault();
     if (editingMaster) {
-      setMasters(masters.map(m => m.id === editingMaster.id ? { ...newMaster, id: m.id } : m));
+      // Corrected: Updating existing master in the context
+      const updatedMasters = masters.map(m => m.id === editingMaster.id ? { ...newMaster, id: m.id } : m);
+      setMasters(updatedMasters);
       addNotification({ title: 'Master Updated', message: `Product ${newMaster.name} has been updated successfully.` });
     } else {
       addMaster(newMaster);
@@ -30,7 +32,9 @@ const ReconMaster = () => {
 
   const handleDelete = (id, name) => {
     if (window.confirm(`Are you sure you want to delete ${name}?`)) {
-      setMasters(masters.filter(m => m.id !== id));
+      // Corrected: Updating context state for deletion
+      const remainingMasters = masters.filter(m => m.id !== id);
+      setMasters(remainingMasters);
       addNotification({ title: 'Master Deleted', message: `Product ${name} removed from system.` });
     }
   };
@@ -51,7 +55,7 @@ const ReconMaster = () => {
         <div className="card animate-fade-in" style={{ marginBottom: '32px', maxWidth: '800px', borderTop: '4px solid var(--primary)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
             <h3 style={{ fontSize: '18px' }}>{editingMaster ? 'Update' : 'New'} Reconciliation Product Configuration</h3>
-            <button onClick={() => setShowForm(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748B' }}>
+            <button onClick={() => { setShowForm(false); setEditingMaster(null); }} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748B' }}>
               <X size={20} />
             </button>
           </div>
