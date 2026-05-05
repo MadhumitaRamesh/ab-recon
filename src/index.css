@@ -180,6 +180,10 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* Responsive Web Design (RWD) */
+:root {
+  --sidebar-width: 280px;
+}
+
 @media (max-width: 1024px) {
   :root {
     --sidebar-width: 240px;
@@ -188,21 +192,18 @@ h1, h2, h3, h4, h5, h6 {
 
 @media (max-width: 768px) {
   :root {
-    --sidebar-width: 0px; /* Hide sidebar by default on mobile */
+    --sidebar-width: 0px;
   }
 
   .main-content {
-    margin-left: 0;
-    padding: 16px;
-    padding-top: calc(var(--header-height) + 16px);
-  }
-
-  .sidebar-mobile-active {
-    --sidebar-width: 280px;
+    margin-left: 0 !important;
+    padding: 16px !important;
+    padding-top: calc(var(--header-height) + 16px) !important;
+    width: 100% !important;
   }
 
   .grid-4 {
-    grid-template-columns: repeat(2, 1fr) !important;
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)) !important;
   }
 
   .grid-2-1 {
@@ -210,7 +211,16 @@ h1, h2, h3, h4, h5, h6 {
   }
 
   .header-search {
-    display: none; /* Hide search in header on mobile */
+    display: none !important;
+  }
+
+  .btn {
+    padding: 8px 12px;
+    font-size: 13px;
+  }
+
+  h1 {
+    font-size: 20px !important;
   }
 }
 
@@ -220,23 +230,55 @@ h1, h2, h3, h4, h5, h6 {
   }
   
   .card {
-    padding: 16px;
+    padding: 16px !important;
+    border-radius: 8px !important;
   }
 
-  h1 {
-    font-size: 20px !important;
+  .data-table th, .data-table td {
+    padding: 12px !important;
+    font-size: 12px !important;
   }
+
+  .status-pill {
+    padding: 2px 8px !important;
+    font-size: 10px !important;
+  }
+}
+
+/* Global Layout Fixes */
+.app-layout {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg-light);
+  width: 100%;
+  overflow-x: hidden;
+}
+
+.main-content {
+  margin-left: var(--sidebar-width);
+  padding: 32px;
+  padding-top: calc(var(--header-height) + 32px);
+  min-height: 100vh;
+  transition: all 0.3s ease;
+  width: calc(100% - var(--sidebar-width));
+  box-sizing: border-box;
 }
 
 /* Utility Classes for Grids */
 .grid-4 {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 24px;
+  gap: 20px;
 }
 
 .grid-2-1 {
   display: grid;
   grid-template-columns: 1.8fr 1fr;
-  gap: 24px;
+  gap: 20px;
+}
+
+.responsive-table-container {
+  width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
 }
