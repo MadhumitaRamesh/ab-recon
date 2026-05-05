@@ -22,8 +22,8 @@ const Navbar = ({ user, onLogout }) => {
       alignItems: 'center',
       justifyContent: 'space-between',
       padding: '0 24px',
-      transition: 'left 0.3s ease'
-    }}>
+      transition: 'all 0.3s ease'
+    }} className="header-nav">
       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', flex: 1 }}>
         <button 
           className="mobile-toggle"
@@ -36,10 +36,10 @@ const Navbar = ({ user, onLogout }) => {
             color: '#64748B'
           }}
         >
-          {sidebarOpen ? <X size={24} /> : <Menu size={24} />}
+          <Menu size={24} />
         </button>
 
-        <div className="header-search" style={{ position: 'relative', width: '300px' }}>
+        <div className="header-search" style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
           <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: '#94A3B8' }} />
           <input 
             type="text" 
@@ -58,7 +58,7 @@ const Navbar = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
         {/* Notifications */}
         <div style={{ position: 'relative' }}>
           <button 
@@ -98,7 +98,7 @@ const Navbar = ({ user, onLogout }) => {
               position: 'absolute', 
               top: '40px', 
               right: '0', 
-              width: '320px', 
+              width: '280px', 
               background: 'white', 
               borderRadius: '8px', 
               boxShadow: '0 10px 25px rgba(0,0,0,0.1)', 
@@ -111,7 +111,7 @@ const Navbar = ({ user, onLogout }) => {
                   onClick={() => { markAllAsRead(); setShowNotifs(false); }}
                   style={{ fontSize: '11px', color: 'var(--primary)', background: 'transparent', border: 'none', cursor: 'pointer', fontWeight: '600' }}
                 >
-                  Mark all as read
+                  Mark all
                 </button>
               </div>
               <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
@@ -123,13 +123,10 @@ const Navbar = ({ user, onLogout }) => {
                     display: 'flex',
                     gap: '12px'
                   }}>
-                    <div style={{ marginTop: '2px' }}>
-                      <CheckCircle size={16} color={n.read ? '#CBD5E1' : 'var(--primary)'} />
-                    </div>
+                    <CheckCircle size={14} color={n.read ? '#CBD5E1' : 'var(--primary)'} style={{ marginTop: '2px' }} />
                     <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: '13px', fontWeight: n.read ? '500' : '600', color: '#1E293B' }}>{n.title}</div>
-                      <div style={{ fontSize: '12px', color: '#64748B', marginTop: '2px' }}>{n.message}</div>
-                      <div style={{ fontSize: '11px', color: '#94A3B8', marginTop: '4px' }}>{n.time}</div>
+                      <div style={{ fontSize: '12px', fontWeight: '600', color: '#1E293B' }}>{n.title}</div>
+                      <div style={{ fontSize: '11px', color: '#64748B' }}>{n.message}</div>
                     </div>
                   </div>
                 ))}
@@ -138,48 +135,29 @@ const Navbar = ({ user, onLogout }) => {
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }} className="user-profile">
-          <div style={{ textAlign: 'right', display: 'none' }} className="d-md-block">
-            <div style={{ fontSize: '12px', fontWeight: '600' }}>{user.employeeId}</div>
-            <div style={{ fontSize: '10px', color: 'var(--primary)', fontWeight: '700', textTransform: 'uppercase' }}>{user.role}</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }} className="user-info">
+          <div style={{ textAlign: 'right', display: 'none' }} className="user-details">
+            <div style={{ fontSize: '12px', fontWeight: '700' }}>{user.employeeId}</div>
+            <div style={{ fontSize: '10px', color: 'var(--primary)', textTransform: 'uppercase', fontWeight: '800' }}>{user.role}</div>
           </div>
-          <div style={{ 
-            width: '34px', 
-            height: '34px', 
-            borderRadius: '8px', 
-            background: '#F1F5F9',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: 'var(--primary)',
-            border: '1px solid #E2E8F0'
-          }}>
-            <User size={18} />
+          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #E2E8F0' }}>
+            <User size={16} color="var(--primary)" />
           </div>
         </div>
 
-        <button 
-          onClick={onLogout}
-          style={{ 
-            background: 'transparent',
-            border: 'none',
-            color: '#64748B',
-            cursor: 'pointer',
-            padding: '4px'
-          }}
-        >
+        <button onClick={onLogout} style={{ background: 'transparent', border: 'none', color: '#64748B', cursor: 'pointer' }}>
           <LogOut size={20} />
         </button>
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
         @media (max-width: 768px) {
+          .header-nav { left: 0 !important; padding: 0 16px !important; }
           .mobile-toggle { display: block !important; }
-          .d-md-block { display: none !important; }
-          .user-profile { gap: 0 !important; }
+          .user-details { display: none !important; }
         }
         @media (min-width: 769px) {
-          .d-md-block { display: block !important; }
+          .user-details { display: block !important; }
         }
       `}} />
     </div>

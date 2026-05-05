@@ -16,10 +16,23 @@ const Login = () => {
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyCenter: 'center', background: '#F0F2F5', padding: '20px', justifyContent: 'center' }}>
-      <div className="card" style={{ width: '100%', maxWidth: '440px', padding: '48px', boxShadow: '0 10px 25px rgba(0,0,0,0.05)' }}>
+    <div style={{ 
+      minHeight: '100vh', 
+      display: 'flex', 
+      alignItems: 'center', 
+      justifyContent: 'center', 
+      background: '#F0F2F5', 
+      padding: '16px' 
+    }}>
+      <div className="card" style={{ 
+        width: '100%', 
+        maxWidth: '440px', 
+        padding: 'clamp(24px, 5vw, 48px)', 
+        boxShadow: '0 10px 25px rgba(0,0,0,0.05)',
+        marginBottom: 0
+      }}>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
-          <div style={{ color: 'var(--primary)', fontWeight: '800', fontSize: '24px', letterSpacing: '-0.5px', fontFamily: 'Outfit, sans-serif' }}>
+          <div style={{ color: 'var(--primary)', fontWeight: '800', fontSize: 'clamp(20px, 4vw, 24px)', letterSpacing: '-0.5px', fontFamily: 'Outfit, sans-serif' }}>
             ADITYA BIRLA CAPITAL
           </div>
           <div style={{ marginTop: '8px', fontSize: '14px', color: 'var(--text-muted)', fontWeight: '500' }}>

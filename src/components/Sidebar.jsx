@@ -39,22 +39,24 @@ const Sidebar = () => {
   return (
     <>
       {/* Mobile Backdrop */}
-      {sidebarOpen && (
-        <div 
-          onClick={() => setSidebarOpen(false)}
-          style={{ 
-            position: 'fixed', 
-            top: 0, 
-            left: 0, 
-            right: 0, 
-            bottom: 0, 
-            background: 'rgba(0,0,0,0.5)', 
-            zIndex: 95 
-          }} 
-        />
-      )}
+      <div 
+        onClick={() => setSidebarOpen(false)}
+        className={`sidebar-backdrop ${sidebarOpen ? 'active' : ''}`}
+        style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          background: 'rgba(0,0,0,0.5)', 
+          zIndex: 95,
+          opacity: sidebarOpen ? 1 : 0,
+          visibility: sidebarOpen ? 'visible' : 'hidden',
+          transition: 'all 0.3s ease'
+        }} 
+      />
 
-      <div style={{ 
+      <div className={`sidebar ${sidebarOpen ? 'mobile-open' : ''}`} style={{ 
         width: 'var(--sidebar-width)', 
         height: '100vh', 
         background: '#1A1C1E', 
@@ -66,19 +68,18 @@ const Sidebar = () => {
         display: 'flex',
         flexDirection: 'column',
         boxShadow: '4px 0 10px rgba(0,0,0,0.1)',
-        transition: 'all 0.3s ease',
-        transform: sidebarOpen ? 'translateX(0)' : (window.innerWidth <= 768 ? 'translateX(-100%)' : 'translateX(0)')
-      }} className={sidebarOpen ? 'sidebar-mobile-active' : ''}>
+        transition: 'all 0.3s ease'
+      }}>
         <div style={{ padding: '32px 24px', borderBottom: '1px solid #2D3135', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div style={{ color: 'var(--primary)', fontWeight: '900', fontSize: '20px', fontFamily: 'Outfit, sans-serif' }}>
             ABC <span style={{ color: 'white', fontWeight: '400' }}>RECON</span>
           </div>
           <button 
-            className="d-md-none" 
+            className="mobile-close-btn" 
             onClick={() => setSidebarOpen(false)}
-            style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer' }}
+            style={{ background: 'transparent', border: 'none', color: '#94A3B8', cursor: 'pointer', display: 'none' }}
           >
-            <X size={20} />
+            <X size={24} />
           </button>
         </div>
 
@@ -86,7 +87,7 @@ const Sidebar = () => {
           {filteredItems.map(item => (
             <button 
               key={item.id}
-              onClick={() => { setActivePage(item.id); if(window.innerWidth <= 768) setSidebarOpen(false); }}
+              onClick={() => { setActivePage(item.id); setSidebarOpen(false); }}
               style={{ 
                 width: '100%',
                 padding: '12px 24px',
@@ -113,16 +114,22 @@ const Sidebar = () => {
         <div style={{ padding: '24px', borderTop: '1px solid #2D3135', background: '#141618' }}>
           <div style={{ fontSize: '12px', color: '#64748B', fontWeight: '500' }}>PLATFORM V2.0</div>
         </div>
-      </div>
 
-      <style dangerouslySetInnerHTML={{ __html: `
-        @media (max-width: 768px) {
-          .d-md-none { display: block !important; }
-        }
-        @media (min-width: 769px) {
-          .d-md-none { display: none !important; }
-        }
-      `}} />
+        <style dangerouslySetInnerHTML={{ __html: `
+          @media (max-width: 768px) {
+            .sidebar {
+              width: 280px !important;
+              transform: translateX(-100%);
+            }
+            .sidebar.mobile-open {
+              transform: translateX(0);
+            }
+            .mobile-close-btn {
+              display: block !important;
+            }
+          }
+        `}} />
+      </div>
     </>
   );
 };
