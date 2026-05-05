@@ -95,7 +95,7 @@ const Dashboard = () => {
             <button 
               className="btn btn-outline" 
               style={{ height: '32px', fontSize: '12px', whiteSpace: 'nowrap' }}
-              onClick={() => setActivePage('runs')}
+              onClick={() => setActivePage('history')}
             >
               View Full History
             </button>

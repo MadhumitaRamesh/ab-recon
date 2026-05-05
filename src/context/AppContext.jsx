@@ -17,7 +17,7 @@ export const AppProvider = ({ children }) => {
 
   // Module Access Permissions
   const modules = [
-    'Dashboard', 'Recon Masters', 'Run Recon', 'Exception Queue', 
+    'Dashboard', 'Recon Masters', 'Run Recon', 'Run History', 'Exception Queue', 
     'AI Suggestions', 'Reports', 'Audit Log', 'Users', 'Roles', 'Permissions'
   ];
 
@@ -33,9 +33,10 @@ export const AppProvider = ({ children }) => {
   initialPermissions['Dashboard']['Ops_Maker'] = true;
   initialPermissions['Dashboard']['Ops_Checker'] = true;
   initialPermissions['Dashboard']['CS User'] = true;
-  initialPermissions['Run Recon']['Ops_Maker'] = true;
-  initialPermissions['Exception Queue']['Ops_Maker'] = true;
-  initialPermissions['Exception Queue']['Ops_Checker'] = true;
+  initialPermissions['Run History']['Admin'] = true;
+  initialPermissions['Run History']['Ops_Maker'] = true;
+  initialPermissions['Run History']['Ops_Checker'] = true;
+  initialPermissions['Run History']['CS User'] = true;
   initialPermissions['Reports']['CS User'] = true;
 
   const [permissions, setPermissions] = useState(initialPermissions);

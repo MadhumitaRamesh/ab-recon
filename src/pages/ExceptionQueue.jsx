@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useApp } from '../context/AppContext';
 import { 
   Filter, 
   Download, 
@@ -7,25 +8,54 @@ import {
   Zap,
   Clock,
   ArrowRight,
-  X
+  X,
+  CheckCircle2
 } from 'lucide-react';
 
 const ExceptionQueue = () => {
+  const { addNotification } = useApp();
   const [selectedEx, setSelectedEx] = useState(null);
-  
-  const exceptions = [
+  const [searchQuery, setSearchQuery] = useState('');
+  const [exceptions, setExceptions] = useState([
     { id: 'TXN-4122', amount: '15,000.00', ref: 'ABC123456789', type: 'Amount Mismatch', age: '48h', priority: 'High', status: 'Unresolved' },
     { id: 'TXN-4123', amount: '2,500.00', ref: 'DEP-998877', type: 'Missing Entry', age: '24h', priority: 'Medium', status: 'Pending Review' },
     { id: 'TXN-4124', amount: '50,000.00', ref: 'WD-554433', type: 'Duplicate', age: '5h', priority: 'High', status: 'Investigating' },
     { id: 'TXN-4125', amount: '125.50', ref: 'REF-001', type: 'Timing Difference', age: '72h', priority: 'Low', status: 'Unresolved' },
     { id: 'TXN-4126', amount: '4,200.00', ref: 'TR-112233', type: 'Reversal', age: '1h', priority: 'Medium', status: 'Unresolved' },
-  ];
+  ]);
 
   const suggestions = [
     { id: 'SUG-01', candidateId: 'BK-445', amount: '15,000.00', confidence: 94, reason: 'Exact amount, fuzzy reference match (ABC-1234)' },
     { id: 'SUG-02', candidateId: 'BK-882', amount: '14,995.00', confidence: 82, reason: 'High reference similarity, small variance (₹5)' },
     { id: 'SUG-03', candidateId: 'BK-110', confidence: 45, reason: 'Amount match only, different reference pattern' },
   ];
+
+  const filteredExceptions = exceptions.filter(ex => 
+    ex.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    ex.ref.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    ex.type.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleAcceptMatch = (candidate) => {
+    setExceptions(exceptions.filter(ex => ex.id !== selectedEx.id));
+    addNotification({
+      title: 'Match Accepted',
+      message: `Transaction ${selectedEx.id} matched with ${candidate.candidateId} successfully.`
+    });
+    setSelectedEx(null);
+  };
+
+  const handleManualOverride = () => {
+    const reason = window.prompt("Enter reason for manual override:");
+    if (reason) {
+      setExceptions(exceptions.filter(ex => ex.id !== selectedEx.id));
+      addNotification({
+        title: 'Manual Override Applied',
+        message: `Transaction ${selectedEx.id} forced to match. Reason: ${reason}`
+      });
+      setSelectedEx(null);
+    }
+  };
 
   return (
     <div className="main-content">
@@ -49,7 +79,9 @@ const ExceptionQueue = () => {
                 <input 
                   type="text" 
                   className="form-control" 
-                  placeholder="Search exceptions..." 
+                  placeholder="Search by ID, Reference or Type..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                   style={{ height: '34px', fontSize: '13px', paddingLeft: '34px', background: '#F8FAFC' }}
                 />
               </div>
@@ -68,7 +100,7 @@ const ExceptionQueue = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {exceptions.map(ex => (
+                  {filteredExceptions.length > 0 ? filteredExceptions.map(ex => (
                     <tr 
                       key={ex.id} 
                       onClick={() => setSelectedEx(ex)}
@@ -93,7 +125,11 @@ const ExceptionQueue = () => {
                       <td><span className="status-pill status-info" style={{ background: '#F1F5F9', color: '#475569' }}>{ex.status}</span></td>
                       <td><MoreHorizontal size={16} color="#94A3B8" /></td>
                     </tr>
-                  ))}
+                  )) : (
+                    <tr>
+                      <td colSpan="7" style={{ textAlign: 'center', padding: '40px', color: '#94A3B8' }}>No exceptions found matching "{searchQuery}"</td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -154,14 +190,30 @@ const ExceptionQueue = () => {
                     </div>
                     <p style={{ fontSize: '12px', color: '#64748B', lineHeight: '1.5', marginBottom: '16px' }}>{sug.reason}</p>
                     <div style={{ display: 'flex', gap: '8px' }}>
-                      <button className="btn btn-primary" style={{ flex: 1, height: '32px', fontSize: '11px' }}>Accept Match</button>
-                      <button className="btn btn-outline" style={{ flex: 1, height: '32px', fontSize: '11px' }}>Review</button>
+                      <button 
+                        className="btn btn-primary" 
+                        style={{ flex: 1, height: '32px', fontSize: '11px' }}
+                        onClick={() => handleAcceptMatch(sug)}
+                      >
+                        Accept Match
+                      </button>
+                      <button 
+                        className="btn btn-outline" 
+                        style={{ flex: 1, height: '32px', fontSize: '11px' }}
+                        onClick={() => alert(`Reviewing candidate ${sug.candidateId}...`)}
+                      >
+                        Review
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <button className="btn btn-outline" style={{ width: '100%', marginTop: '24px', borderColor: 'var(--primary)', color: 'var(--primary)', fontSize: '12px' }}>
+              <button 
+                className="btn btn-outline" 
+                style={{ width: '100%', marginTop: '24px', borderColor: 'var(--primary)', color: 'var(--primary)', fontSize: '12px' }}
+                onClick={handleManualOverride}
+              >
                 Manual Override & Match <ArrowRight size={14} style={{ marginLeft: '8px' }} />
               </button>
             </div>

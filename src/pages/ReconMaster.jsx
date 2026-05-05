@@ -1,17 +1,38 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Plus, Database, Settings2, FileCode, Activity, Edit3, Trash2 } from 'lucide-react';
+import { Plus, Database, Settings2, FileCode, Edit3, Trash2, X } from 'lucide-react';
 
 const ReconMaster = () => {
-  const { masters, addMaster } = useApp();
+  const { masters, setMasters, addMaster, addNotification } = useApp();
   const [showForm, setShowForm] = useState(false);
+  const [editingMaster, setEditingMaster] = useState(null);
   const [newMaster, setNewMaster] = useState({ name: '', frequency: 'Daily', type: 'Automatic', sources: '2-Way', status: 'Active' });
 
   const handleAdd = (e) => {
     e.preventDefault();
-    addMaster(newMaster);
+    if (editingMaster) {
+      setMasters(masters.map(m => m.id === editingMaster.id ? { ...newMaster, id: m.id } : m));
+      addNotification({ title: 'Master Updated', message: `Product ${newMaster.name} has been updated successfully.` });
+    } else {
+      addMaster(newMaster);
+      addNotification({ title: 'Master Created', message: `New product ${newMaster.name} initialized.` });
+    }
     setShowForm(false);
+    setEditingMaster(null);
     setNewMaster({ name: '', frequency: 'Daily', type: 'Automatic', sources: '2-Way', status: 'Active' });
+  };
+
+  const handleEdit = (master) => {
+    setEditingMaster(master);
+    setNewMaster({ ...master });
+    setShowForm(true);
+  };
+
+  const handleDelete = (id, name) => {
+    if (window.confirm(`Are you sure you want to delete ${name}?`)) {
+      setMasters(masters.filter(m => m.id !== id));
+      addNotification({ title: 'Master Deleted', message: `Product ${name} removed from system.` });
+    }
   };
 
   return (
@@ -21,14 +42,19 @@ const ReconMaster = () => {
           <h1 style={{ fontSize: '24px', color: '#0F172A' }}>Reconciliation Master Records</h1>
           <p style={{ color: '#64748B', fontSize: '14px', marginTop: '4px' }}>Define data sources, matching frequency, and processing modes for reconciliation products.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(true)}>
+        <button className="btn btn-primary" onClick={() => { setShowForm(true); setEditingMaster(null); setNewMaster({ name: '', frequency: 'Daily', type: 'Automatic', sources: '2-Way', status: 'Active' }); }}>
           <Plus size={16} style={{ marginRight: '8px' }} /> Create New Master
         </button>
       </div>
 
       {showForm && (
         <div className="card animate-fade-in" style={{ marginBottom: '32px', maxWidth: '800px', borderTop: '4px solid var(--primary)' }}>
-          <h3 style={{ fontSize: '18px', marginBottom: '24px' }}>New Reconciliation Product Configuration</h3>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+            <h3 style={{ fontSize: '18px' }}>{editingMaster ? 'Update' : 'New'} Reconciliation Product Configuration</h3>
+            <button onClick={() => setShowForm(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748B' }}>
+              <X size={20} />
+            </button>
+          </div>
           <form onSubmit={handleAdd}>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '24px', marginBottom: '24px' }}>
               <div className="form-group">
@@ -55,7 +81,9 @@ const ReconMaster = () => {
               </div>
             </div>
             <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
-              <button type="submit" className="btn btn-primary" style={{ flex: '1 1 auto', minWidth: '150px' }}>Initialize Master</button>
+              <button type="submit" className="btn btn-primary" style={{ flex: '1 1 auto', minWidth: '150px' }}>
+                {editingMaster ? 'Save Changes' : 'Initialize Master'}
+              </button>
               <button type="button" className="btn btn-outline" style={{ flex: '1 1 auto', minWidth: '150px' }} onClick={() => setShowForm(false)}>Cancel</button>
             </div>
           </form>
@@ -91,7 +119,12 @@ const ReconMaster = () => {
                   <td><div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><Settings2 size={14} color="#64748B" /><span>{m.type}</span></div></td>
                   <td><div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}><FileCode size={14} color="#64748B" /><span>{m.sources}</span></div></td>
                   <td><span className={`status-pill ${m.status === 'Active' ? 'status-success' : 'status-danger'}`}>{m.status}</span></td>
-                  <td><div style={{ display: 'flex', gap: '12px' }}><Edit3 size={16} color="#64748B" /><Trash2 size={16} color="#DC2626" /></div></td>
+                  <td>
+                    <div style={{ display: 'flex', gap: '12px' }}>
+                      <Edit3 size={16} color="#64748B" style={{ cursor: 'pointer' }} onClick={() => handleEdit(m)} />
+                      <Trash2 size={16} color="#DC2626" style={{ cursor: 'pointer' }} onClick={() => handleDelete(m.id, m.name)} />
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
