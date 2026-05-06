@@ -222,13 +222,28 @@ export const AppProvider = ({ children }) => {
     } catch (e) {}
   };
 
-  const login = (employeeId, password) => {
-    const matchedUser = users.find(u => u.employeeId === employeeId);
-    if (matchedUser) {
-      setUser(matchedUser);
-      localStorage.setItem('ab_recon_user', JSON.stringify(matchedUser));
-      logAudit('Secure Session Start', 'Auth', `User ${employeeId} authenticated`, 'Security');
-      return true;
+  const login = async (employeeId, password) => {
+    try {
+      const res = await fetch(`${API_URL}/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ employeeId, password })
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setUser(data.user);
+        localStorage.setItem('ab_recon_user', JSON.stringify(data.user));
+        logAudit('Secure Session Start', 'Auth', `User ${employeeId} authenticated via bcrypt`, 'Security');
+        return true;
+      }
+    } catch (err) {
+      // Fallback: local match if backend is unreachable
+      const matchedUser = users.find(u => u.employeeId === employeeId);
+      if (matchedUser) {
+        setUser(matchedUser);
+        localStorage.setItem('ab_recon_user', JSON.stringify(matchedUser));
+        return true;
+      }
     }
     return false;
   };

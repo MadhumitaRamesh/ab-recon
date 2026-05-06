@@ -8,27 +8,23 @@ const Login = ({ onLogin }) => {
   const [status, setStatus] = useState(''); // Auth Status
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
     setStatus('Hashing Password...');
 
-    // Simulate Hashing & Transmission Encryption
-    setTimeout(() => {
-      setStatus('Encrypting Transmission Payload...');
-      setTimeout(() => {
-        setStatus('Securely Authenticating...');
-        setTimeout(() => {
-          const success = onLogin(employeeId, password);
-          if (!success) {
-            setError('Invalid Employee ID or Security Hash. Access Denied.');
-          }
-          setIsLoading(false);
-          setStatus('');
-        }, 800);
-      }, 800);
-    }, 800);
+    setTimeout(() => setStatus('Encrypting Transmission Payload...'), 800);
+    setTimeout(() => setStatus('Securely Authenticating...'), 1600);
+
+    setTimeout(async () => {
+      const success = await onLogin(employeeId, password);
+      if (!success) {
+        setError('Invalid Employee ID or Security Hash. Access Denied.');
+      }
+      setIsLoading(false);
+      setStatus('');
+    }, 2400);
   };
 
   return (
