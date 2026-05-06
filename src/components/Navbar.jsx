@@ -8,6 +8,12 @@ const Navbar = () => {
 
   const unreadCount = notifications.filter(n => !n.read).length;
 
+  const handleLogoutClick = (e) => {
+    e.preventDefault();
+    console.log('Logout Clicked');
+    logout();
+  };
+
   if (!user) return null;
 
   return (
@@ -150,7 +156,7 @@ const Navbar = () => {
             <User size={20} color="var(--primary)" />
           </div>
           <button 
-            onClick={logout} 
+            onClick={handleLogoutClick} 
             title="Secure Sign Out"
             style={{ 
               background: '#FEE2E2', 
@@ -162,7 +168,8 @@ const Navbar = () => {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              zIndex: 1000 // Ensure it's on top
             }}
           >
             <LogOut size={20} />

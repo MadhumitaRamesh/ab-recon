@@ -202,10 +202,10 @@ export const AppProvider = ({ children }) => {
     localStorage.removeItem('ab_recon_user');
     setUser(null);
     setActivePage('dashboard');
-    // Force a clean state refresh
+    // Force a clean state refresh and hard redirect
     setTimeout(() => {
-      window.location.hash = '';
-    }, 10);
+      window.location.reload();
+    }, 50);
   };
 
   const addMaster = (master) => {
