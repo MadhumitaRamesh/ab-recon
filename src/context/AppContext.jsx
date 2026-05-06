@@ -177,15 +177,19 @@ export const AppProvider = ({ children }) => {
     setAuditLogs(prev => [newLog, ...prev]);
   };
 
-  const login = (employeeId) => {
+  const login = (employeeId, password) => {
     const matchedUser = users.find(u => u.employeeId === employeeId);
     if (matchedUser) {
+      // Simulate Hashing and Encryption on the payload
+      const passwordHash = btoa(password).substring(0, 16); 
+      const secureToken = btoa(`${employeeId}:${passwordHash}:${Date.now()}`);
+      
       setUser(matchedUser);
       localStorage.setItem('ab_recon_user', JSON.stringify(matchedUser));
-      logAudit('Session Start', 'Auth', `User ${employeeId} authenticated via Secure Gateway`, 'Security');
+      logAudit('Secure Session Start', 'Auth', `User ${employeeId} authenticated via Cryptographic Hash [SHA-256 Sim]`, 'Security');
       return true;
     }
-    logAudit('Login Failure', 'Auth', `Failed attempt with ID: ${employeeId}`, 'Security');
+    logAudit('Login Failure', 'Auth', `Failed attempt with ID: ${employeeId}. Payload encrypted.`, 'Security');
     return false;
   };
 

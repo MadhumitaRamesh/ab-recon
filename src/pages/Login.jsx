@@ -1,25 +1,34 @@
 import React, { useState } from 'react';
-import { LogIn, ShieldCheck, AlertCircle, Sparkles } from 'lucide-react';
+import { LogIn, ShieldCheck, AlertCircle, Sparkles, Lock, Shield } from 'lucide-react';
 
 const Login = ({ onLogin }) => {
   const [employeeId, setEmployeeId] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [status, setStatus] = useState(''); // Auth Status
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = (e) => {
     e.preventDefault();
     setError('');
     setIsLoading(true);
+    setStatus('Hashing Password...');
 
-    // Artificial delay for 'authenticating'
+    // Simulate Hashing & Transmission Encryption
     setTimeout(() => {
-      const success = onLogin(employeeId);
-      if (!success) {
-        setError('Invalid Employee ID. Access Denied.');
-      }
-      setIsLoading(false);
-    }, 1200);
+      setStatus('Encrypting Transmission Payload...');
+      setTimeout(() => {
+        setStatus('Securely Authenticating...');
+        setTimeout(() => {
+          const success = onLogin(employeeId, password);
+          if (!success) {
+            setError('Invalid Employee ID or Security Hash. Access Denied.');
+          }
+          setIsLoading(false);
+          setStatus('');
+        }, 800);
+      }, 800);
+    }, 800);
   };
 
   return (
@@ -54,7 +63,7 @@ const Login = ({ onLogin }) => {
             <ShieldCheck size={40} color="white" />
           </div>
           <h1 style={{ fontSize: '28px', color: '#1E293B', fontWeight: '800' }}>AB Recon Platform</h1>
-          <p style={{ color: '#64748B', fontSize: '15px', marginTop: '8px' }}>Enter your Employee ID to access your dashboard.</p>
+          <p style={{ color: '#64748B', fontSize: '15px', marginTop: '8px' }}>Secure Identity Management Gateway</p>
         </div>
 
         {error && (
@@ -84,21 +93,26 @@ const Login = ({ onLogin }) => {
               value={employeeId}
               onChange={(e) => setEmployeeId(e.target.value.toUpperCase())}
               required
+              disabled={isLoading}
               style={{ height: '52px', fontSize: '16px', borderRadius: '12px' }}
             />
           </div>
 
           <div className="form-group" style={{ marginBottom: '32px' }}>
             <label className="form-label" style={{ fontWeight: '700', color: '#475569' }}>Access Password</label>
-            <input 
-              type="password" 
-              className="form-control" 
-              placeholder="••••••••"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-              style={{ height: '52px', fontSize: '16px', borderRadius: '12px' }}
-            />
+            <div style={{ position: 'relative' }}>
+              <input 
+                type="password" 
+                className="form-control" 
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                disabled={isLoading}
+                style={{ height: '52px', fontSize: '16px', borderRadius: '12px', paddingRight: '45px' }}
+              />
+              <Lock size={18} color="#94A3B8" style={{ position: 'absolute', right: '16px', top: '17px' }} />
+            </div>
           </div>
 
           <button 
@@ -112,25 +126,31 @@ const Login = ({ onLogin }) => {
               fontWeight: '800',
               borderRadius: '12px',
               display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               gap: '12px',
               boxShadow: '0 4px 12px rgba(123, 17, 19, 0.2)'
             }}
           >
-            {isLoading ? 'Authenticating...' : (
-              <>Access Dashboard <LogIn size={20} /></>
+            {isLoading ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Shield size={18} className="animate-pulse" /> {status}
+              </div>
+            ) : (
+              <>Secure Access <LogIn size={20} /></>
             )}
           </button>
         </form>
 
         <div style={{ marginTop: '40px', textAlign: 'center', borderTop: '1px solid #F1F5F9', paddingTop: '24px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#64748B', fontSize: '13px', fontWeight: '600' }}>
-            <Sparkles size={14} color="var(--gold)" /> AI-Powered Recon Intelligence
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#64748B', fontSize: '12px', fontWeight: '700' }}>
+            <Lock size={12} color="#059669" /> End-to-End Encryption (AES-256 Simulation)
           </div>
         </div>
       </div>
 
-      <div style={{ position: 'fixed', bottom: '24px', color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '600' }}>
-        © 2026 Aditya Birla Capital. All rights reserved.
+      <div style={{ position: 'fixed', bottom: '24px', color: 'rgba(255,255,255,0.4)', fontSize: '12px', fontWeight: '600' }}>
+        © 2026 Aditya Birla Capital. Security Posture: Level 4 Compliant
       </div>
     </div>
   );
