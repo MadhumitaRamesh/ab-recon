@@ -76,7 +76,7 @@ function App() {
     <div className="app-layout">
       <Sidebar />
       <div style={{ flex: 1, position: 'relative' }}>
-        <Navbar user={user} onLogout={logout} />
+        <Navbar />
         {renderPage()}
       </div>
     </div>

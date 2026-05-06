@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
-import { Bell, LogOut, Search, User, Menu, X, CheckCircle } from 'lucide-react';
+import { Bell, LogOut, Search, User, Menu, X, CheckCircle, Shield } from 'lucide-react';
 
-const Navbar = ({ user, onLogout }) => {
-  const { searchQuery, setSearchQuery, notifications, markAllAsRead, sidebarOpen, setSidebarOpen } = useApp();
+const Navbar = () => {
+  const { user, logout, searchQuery, setSearchQuery, notifications, markAllAsRead, sidebarOpen, setSidebarOpen } = useApp();
   const [showNotifs, setShowNotifs] = useState(false);
 
   const unreadCount = notifications.filter(n => !n.read).length;
+
+  if (!user) return null;
 
   return (
     <div style={{ 
@@ -58,7 +60,11 @@ const Navbar = ({ user, onLogout }) => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#059669', fontSize: '11px', fontWeight: '800', background: '#ECFDF5', padding: '6px 12px', borderRadius: '20px' }}>
+          <Shield size={12} /> SECURE SESSION
+        </div>
+
         {/* Notifications */}
         <div style={{ position: 'relative' }}>
           <button 
@@ -135,19 +141,33 @@ const Navbar = ({ user, onLogout }) => {
           )}
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }} className="user-info">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', paddingLeft: '16px', borderLeft: '1px solid #F1F5F9' }} className="user-info">
           <div style={{ textAlign: 'right', display: 'none' }} className="user-details">
-            <div style={{ fontSize: '12px', fontWeight: '700' }}>{user.employeeId}</div>
-            <div style={{ fontSize: '10px', color: 'var(--primary)', textTransform: 'uppercase', fontWeight: '800' }}>{user.role}</div>
+            <div style={{ fontSize: '13px', fontWeight: '800', color: '#1E293B' }}>{user.employeeId}</div>
+            <div style={{ fontSize: '10px', color: 'var(--primary)', textTransform: 'uppercase', fontWeight: '900', letterSpacing: '0.5px' }}>{user.role.replace('_', ' ')}</div>
           </div>
-          <div style={{ width: '32px', height: '32px', borderRadius: '50%', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #E2E8F0' }}>
-            <User size={16} color="var(--primary)" />
+          <div style={{ width: '40px', height: '40px', borderRadius: '12px', background: '#F1F5F9', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #E2E8F0' }}>
+            <User size={20} color="var(--primary)" />
           </div>
+          <button 
+            onClick={logout} 
+            title="Secure Sign Out"
+            style={{ 
+              background: '#FEE2E2', 
+              border: 'none', 
+              color: '#DC2626', 
+              cursor: 'pointer', 
+              padding: '10px', 
+              borderRadius: '10px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <LogOut size={20} />
+          </button>
         </div>
-
-        <button onClick={onLogout} style={{ background: 'transparent', border: 'none', color: '#64748B', cursor: 'pointer' }}>
-          <LogOut size={20} />
-        </button>
       </div>
 
       <style dangerouslySetInnerHTML={{ __html: `
