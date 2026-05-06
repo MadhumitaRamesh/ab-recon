@@ -8,46 +8,61 @@ const RunRecon = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [terminalLogs, setTerminalLogs] = useState(['> System Idle. Secure Socket Connection Active.']);
   const [engineStatus, setEngineStatus] = useState('STANDBY');
+  const [stepIndex, setStepIndex] = useState(-1);
   const terminalRef = useRef(null);
 
+  // Auto-scroll terminal
   useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [terminalLogs]);
 
-  // Reliable Async Sequence Engine
-  const runEngine = async () => {
+  const sequence = [
+    { msg: '> Verifying SFTP secure handshake...', delay: 600 },
+    { msg: '> Handshake Success. Protocol: TLS 1.3', delay: 400 },
+    { msg: `> Requesting data stream from master...`, delay: 800 },
+    { msg: '> Internal Ledger: 4,220 entries ingested.', delay: 700 },
+    { msg: '> External Statement: 4,218 entries ingested.', delay: 700 },
+    { msg: '> Initializing AI Match Engine...', delay: 1000 },
+    { msg: '> Processing mapping logic: [TXN_REF] -> [UTN_ID]', delay: 800 },
+    { msg: '> Anomaly Detected: 2 records pending review.', delay: 600 },
+    { msg: '> Syncing results to audit trail...', delay: 800 },
+    { msg: '> BUILD SUCCESSFUL', delay: 500 },
+    { msg: '> Recon Cycle Terminated. Exit Code: 0', delay: 300 }
+  ];
+
+  // Engine Sequence Controller
+  useEffect(() => {
+    if (isRunning && stepIndex < sequence.length) {
+      const delay = stepIndex === -1 ? 0 : sequence[stepIndex].delay;
+      const timer = setTimeout(() => {
+        if (stepIndex === -1) {
+          setTerminalLogs([`> Starting Recon Engine for [${selectedProduct}]...`]);
+          setStepIndex(0);
+        } else {
+          setTerminalLogs(prev => [...prev, sequence[stepIndex].msg]);
+          setStepIndex(prev => prev + 1);
+        }
+      }, delay);
+      return () => clearTimeout(timer);
+    } else if (isRunning && stepIndex === sequence.length) {
+      finalizeRun();
+    }
+  }, [isRunning, stepIndex]);
+
+  const startEngine = () => {
     if (!selectedProduct) {
-      setTerminalLogs(prev => [...prev, '> ERROR: No Product Master selected. Execution aborted.']);
+      setTerminalLogs(prev => [...prev, '> ERROR: No Product Master selected.']);
       return;
     }
-
+    setStepIndex(-1);
     setIsRunning(true);
     setEngineStatus('EXECUTING');
-    setTerminalLogs([`> Starting Recon Engine for [${selectedProduct}]...`]);
     logAudit('Manual Run Started', 'Console', `Engine initialized for ${selectedProduct}`, 'System');
+  };
 
-    const steps = [
-      { msg: '> Verifying SFTP secure handshake...', delay: 600 },
-      { msg: '> Handshake Success. Protocol: TLS 1.3', delay: 400 },
-      { msg: `> Requesting data stream from ${selectedProduct} master...`, delay: 800 },
-      { msg: '> Internal Ledger: 4,220 entries ingested.', delay: 700 },
-      { msg: '> External Statement: 4,218 entries ingested.', delay: 700 },
-      { msg: '> Initializing AI Match Engine...', delay: 1000 },
-      { msg: '> Processing mapping logic: [TXN_REF] -> [UTN_ID]', delay: 800 },
-      { msg: '> Anomaly Detected: 2 records pending review.', delay: 600 },
-      { msg: '> Syncing results to audit trail...', delay: 800 },
-      { msg: '> BUILD SUCCESSFUL', delay: 500 },
-      { msg: '> Recon Cycle Terminated. Exit Code: 0', delay: 300 }
-    ];
-
-    for (const step of steps) {
-      await new Promise(resolve => setTimeout(resolve, step.delay));
-      setTerminalLogs(prev => [...prev, step.msg]);
-    }
-
-    // Finalize state changes after the sequence is done
+  const finalizeRun = () => {
     const runId = `RUN-${Math.floor(Math.random() * 900) + 100}`;
     const newRun = { 
       id: runId, 
@@ -61,10 +76,11 @@ const RunRecon = () => {
     
     setRunHistory(prev => [newRun, ...prev]);
     addNotification({ title: 'Build Success', message: `${selectedProduct} cycle verified.` });
-    logAudit('Execution Success', 'Console', `Batch ${runId} finished with exit code 0.`, 'Auto');
+    logAudit('Execution Success', 'Console', `Batch ${runId} finished successfully.`, 'Auto');
     
     setIsRunning(false);
     setEngineStatus('COMPLETED');
+    setStepIndex(sequence.length + 1); // Prevent re-triggering
   };
 
   return (
@@ -123,7 +139,7 @@ const RunRecon = () => {
 
           <button 
             className="btn btn-primary" 
-            onClick={runEngine}
+            onClick={startEngine}
             disabled={isRunning}
             style={{ 
               width: '100%', 
