@@ -79,6 +79,13 @@ p {
   width: 100%;
   max-width: 100%;
   overflow-x: hidden;
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+.card.js-hover {
+  transform: translateY(-5px) scale(1.01);
+  box-shadow: var(--shadow-md);
+  border-color: var(--primary);
 }
 
 /* Buttons */

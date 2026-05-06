@@ -14,7 +14,7 @@ import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 
 function App() {
-  const { user, setUser, activePage, setActivePage, logout, login } = useApp();
+  const { user, setUser, activePage, logout, login } = useApp();
 
   useEffect(() => {
     const savedUser = localStorage.getItem('ab_recon_user');
@@ -22,6 +22,31 @@ function App() {
       setUser(JSON.parse(savedUser));
     }
   }, [setUser]);
+
+  // Global Interactivity Script
+  useEffect(() => {
+    const handleMouseOver = (e) => {
+      const card = e.target.closest('.card');
+      if (card) {
+        card.classList.add('js-hover');
+      }
+    };
+
+    const handleMouseOut = (e) => {
+      const card = e.target.closest('.card');
+      if (card) {
+        card.classList.remove('js-hover');
+      }
+    };
+
+    document.addEventListener('mouseover', handleMouseOver);
+    document.addEventListener('mouseout', handleMouseOut);
+
+    return () => {
+      document.removeEventListener('mouseover', handleMouseOver);
+      document.removeEventListener('mouseout', handleMouseOut);
+    };
+  }, []);
 
   if (!user) {
     return <Login onLogin={login} />;
@@ -34,8 +59,6 @@ function App() {
       case 'runs': return <RunRecon />;
       case 'history': return <RunHistory />;
       case 'exceptions': return <ExceptionQueue />;
-      case 'suggestions': return <ExceptionQueue />;
-      case 'reports': return <div className="main-content"><div className="card"><h3>Reconciliation Reports</h3><p style={{ color: '#64748B', marginTop: '12px' }}>Operational reports for matched and unmatched transactions.</p></div></div>;
       case 'audit': return <AuditLog />;
       case 'users': return <Users />;
       case 'roles': return <Roles />;
@@ -47,7 +70,7 @@ function App() {
   return (
     <div className="app-layout">
       <Sidebar />
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, position: 'relative' }}>
         <Navbar user={user} onLogout={logout} />
         {renderPage()}
       </div>
