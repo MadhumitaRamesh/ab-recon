@@ -11,6 +11,7 @@ const RunRecon = () => {
   const [engineStatus, setEngineStatus] = useState('STANDBY');
   const [stepIndex, setStepIndex] = useState(-1);
   const terminalRef = useRef(null);
+  const isFinalizing = useRef(false);
 
   // Auto-scroll terminal
   useEffect(() => {
@@ -40,43 +41,51 @@ const RunRecon = () => {
       const currentDelay = stepIndex === -1 ? 0 : sequence[stepIndex].delay;
       timer = setTimeout(() => {
         if (stepIndex === -1) {
-          setTerminalLogs([`> Starting Recon Engine for [${selectedProduct}]...`]);
+          setTerminalLogs([`> Starting Recon Engine for [${selectedProduct || 'Unknown'}]...`]);
           setStepIndex(0);
         } else {
           setTerminalLogs(prev => [...prev, sequence[stepIndex].msg]);
           setStepIndex(prev => prev + 1);
         }
       }, currentDelay);
-    } else if (isRunning && stepIndex === sequence.length) {
-      // Direct Finalization (No timeouts here to prevent race conditions)
-      setIsRunning(false);
-      setIsFinished(true);
-      setEngineStatus('COMPLETED');
+    } else if (isRunning && stepIndex === sequence.length && !isFinalizing.current) {
+      // Finalize exactly once
+      isFinalizing.current = true;
       
-      const runId = `RUN-${Math.floor(Math.random() * 900) + 100}`;
-      const newRun = { 
-        id: runId, 
-        product: selectedProduct, 
-        status: 'Completed', 
-        matched: '4,218', 
-        exceptions: '2', 
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2026' })
+      const finalize = () => {
+        const runId = `RUN-${Math.floor(Math.random() * 900) + 100}`;
+        const prodName = selectedProduct || 'General Master';
+        const newRun = { 
+          id: runId, 
+          product: prodName, 
+          status: 'Completed', 
+          matched: '4,218', 
+          exceptions: '2', 
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2026' })
+        };
+        
+        setRunHistory(prev => Array.isArray(prev) ? [newRun, ...prev] : [newRun]);
+        addNotification({ title: 'Build Success', message: `${prodName} cycle verified.` });
+        logAudit('Execution Success', 'Console', `Batch ${runId} finished successfully.`, 'Auto');
+        
+        setIsRunning(false);
+        setIsFinished(true);
+        setEngineStatus('COMPLETED');
       };
-      
-      setRunHistory(prev => Array.isArray(prev) ? [newRun, ...prev] : [newRun]);
-      addNotification({ title: 'Build Success', message: `${selectedProduct} cycle verified.` });
-      logAudit('Execution Success', 'Console', `Batch ${runId} finished successfully.`, 'Auto');
+
+      finalize();
     }
     return () => clearTimeout(timer);
-  }, [isRunning, stepIndex, selectedProduct, sequence.length]);
+  }, [isRunning, stepIndex, selectedProduct]);
 
   const startEngine = (e) => {
-    if (e) e.preventDefault(); // Prevent any form submission reloads
+    if (e) e.preventDefault();
     if (!selectedProduct) {
       setTerminalLogs(prev => [...prev, '> ERROR: No Product Master selected.']);
       return;
     }
+    isFinalizing.current = false;
     setIsFinished(false);
     setStepIndex(-1);
     setIsRunning(true);
@@ -106,12 +115,12 @@ const RunRecon = () => {
           </h3>
           
           <div className="form-group" style={{ marginBottom: '32px' }}>
-            <label className="form-label">Target Product Master</label>
+            <label className="form-label" style={{ fontWeight: '800', color: '#475569', fontSize: '12px', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>Target Product Master</label>
             <select 
               className="form-control" 
               value={selectedProduct}
               onChange={(e) => setSelectedProduct(e.target.value)}
-              style={{ height: '64px', borderRadius: '14px' }}
+              style={{ height: '64px', borderRadius: '14px', fontSize: '16px', border: '2px solid #E2E8F0' }}
               disabled={isRunning}
             >
               <option value="">-- Select Master --</option>
@@ -123,15 +132,15 @@ const RunRecon = () => {
 
           <div style={{ flex: 1 }}>
             {isFinished ? (
-              <div style={{ padding: '32px', background: '#ECFDF5', borderRadius: '24px', textAlign: 'center', border: '2px solid #D1FAE5' }} className="animate-fade-in">
-                <CheckCircle size={48} color="#10B981" style={{ margin: '0 auto 16px' }} />
-                <h4 style={{ color: '#064E3B', fontWeight: '900', fontSize: '18px', marginBottom: '8px' }}>BUILD SUCCESSFUL</h4>
-                <p style={{ color: '#065F46', fontSize: '14px' }}>Execution cycle for {selectedProduct} completed.</p>
+              <div style={{ padding: '24px', background: '#ECFDF5', borderRadius: '24px', textAlign: 'center', border: '2px solid #D1FAE5' }} className="animate-fade-in">
+                <CheckCircle size={40} color="#10B981" style={{ margin: '0 auto 12px' }} />
+                <h4 style={{ color: '#064E3B', fontWeight: '900', fontSize: '16px', marginBottom: '4px' }}>BUILD SUCCESSFUL</h4>
+                <p style={{ color: '#065F46', fontSize: '12px' }}>Reconciliation archived.</p>
                 <button 
                   onClick={() => setIsFinished(false)}
-                  style={{ marginTop: '20px', background: '#059669', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '10px', cursor: 'pointer', fontWeight: '700' }}
+                  style={{ marginTop: '16px', background: '#059669', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '13px' }}
                 >
-                  Return to Dashboard
+                  Run New Cycle
                 </button>
               </div>
             ) : (
@@ -154,12 +163,22 @@ const RunRecon = () => {
               className="btn btn-primary" 
               onClick={startEngine}
               disabled={isRunning}
-              style={{ width: '100%', height: '76px', fontSize: '20px', fontWeight: '900', borderRadius: '18px' }}
+              style={{ 
+                width: '100%', 
+                height: '60px', // Made smaller
+                fontSize: '16px', // Adjusted text size
+                fontWeight: '900', 
+                borderRadius: '14px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '12px'
+              }}
             >
               {isRunning ? (
-                <><RefreshCw size={24} className="animate-spin" /> EXECUTING...</>
+                <><RefreshCw size={20} className="animate-spin" /> EXECUTING...</>
               ) : (
-                <><Play size={24} fill="white" /> TRIGGER ENGINE</>
+                <><Play size={20} fill="white" /> TRIGGER ENGINE</>
               )}
             </button>
           )}
@@ -216,7 +235,7 @@ const RunRecon = () => {
           
           <div className="card" style={{ marginTop: '24px', padding: '24px', background: '#FEF2F2', border: '2px solid #FEE2E2', display: 'flex', gap: '16px', alignItems: 'center', borderRadius: '18px' }}>
             <AlertTriangle size={24} color="#DC2626" />
-            <p style={{ fontSize: '13px', color: '#991B1B', fontWeight: '800' }}>Forensic Warning: All keystrokes recorded in SOC2 vault.</p>
+            <p style={{ fontSize: '13px', color: '#991B1B', fontWeight: '800' }}>Forensic Warning: Manual override in progress.</p>
           </div>
         </div>
       </div>
