@@ -75,6 +75,13 @@ export const AppProvider = ({ children }) => {
     { id: 2, title: 'Permission Update', message: 'Admin role modified module access grid.', time: '5h ago', read: true },
   ]));
 
+  // AI Suggestions Persistence
+  const [aiSuggestions, setAiSuggestions] = useState(() => getSavedData('ab_recon_ai_suggestions', [
+    { id: 'AI-201', type: 'Pattern Match', confidence: 98, detail: 'Recurring ₹5,000 mismatch detected in UPI logs. Likely bank service charge misclassification.', action: 'Bulk Resolve' },
+    { id: 'AI-202', type: 'Anomaly Detection', confidence: 85, detail: 'Transaction TXN-8821 shows 48h settlement lag. Potential API timeout at partner gateway.', action: 'Flag for Review' },
+    { id: 'AI-203', type: 'Predictive Mapping', confidence: 92, detail: 'Automated mapping suggested for 45 "Missing Entry" records based on historical BBPS patterns.', action: 'Apply Mapping' },
+  ]));
+
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
@@ -84,6 +91,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { localStorage.setItem('ab_recon_masters', JSON.stringify(masters)); }, [masters]);
   useEffect(() => { localStorage.setItem('ab_recon_exceptions', JSON.stringify(exceptions)); }, [exceptions]);
   useEffect(() => { localStorage.setItem('ab_recon_notifications', JSON.stringify(notifications)); }, [notifications]);
+  useEffect(() => { localStorage.setItem('ab_recon_ai_suggestions', JSON.stringify(aiSuggestions)); }, [aiSuggestions]);
 
   const login = (userData) => {
     setUser(userData);
@@ -116,6 +124,7 @@ export const AppProvider = ({ children }) => {
       permissions, setPermissions,
       masters, setMasters, addMaster,
       exceptions, setExceptions,
+      aiSuggestions, setAiSuggestions,
       notifications, addNotification, markAllAsRead,
       searchQuery, setSearchQuery,
       sidebarOpen, setSidebarOpen,
