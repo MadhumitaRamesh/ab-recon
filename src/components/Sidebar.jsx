@@ -18,6 +18,8 @@ import {
 const Sidebar = () => {
   const { user, activePage, setActivePage, permissions, sidebarOpen, setSidebarOpen } = useApp();
 
+  if (!user || !permissions) return null;
+
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, moduleName: 'Dashboard' },
     { id: 'masters', label: 'Recon Masters', icon: Settings, moduleName: 'Recon Masters' },

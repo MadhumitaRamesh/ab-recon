@@ -11,7 +11,8 @@ const RunHistory = () => {
     setIsLoaded(true);
   }, []);
 
-  const filteredHistory = runHistory.filter(run => {
+  const filteredHistory = (Array.isArray(runHistory) ? runHistory : []).filter(run => {
+    if (!run || !run.product) return false;
     const matchesSearch = run.product.toLowerCase().includes(searchQuery.toLowerCase()) || run.id.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = filterStatus === 'All' || run.status === filterStatus;
     return matchesSearch && matchesStatus;

@@ -28,10 +28,12 @@ const Dashboard = () => {
     { label: 'Auto-Recon Efficiency', value: '78.2%', trend: '+5.1%', icon: Cpu, color: 'var(--gold)' },
   ];
 
-  const filteredRuns = runHistory.filter(run => 
-    run.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    run.id.toLowerCase().includes(searchQuery.toLowerCase())
-  ).slice(0, 4); // Show only top 4 on dashboard
+  const filteredRuns = (Array.isArray(runHistory) ? runHistory : []).filter(run => 
+    run && run.product && (
+      run.product.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      run.id.toLowerCase().includes(searchQuery.toLowerCase())
+    )
+  ).slice(0, 4);
 
   const handleManualSync = () => {
     setIsSyncing(true);
