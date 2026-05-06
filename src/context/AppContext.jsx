@@ -17,10 +17,15 @@ export const AppProvider = ({ children }) => {
         localStorage.removeItem(key);
         return defaultValue;
       }
-      // Migration: Check if roles data is in old format (missing description or using generic fallback)
-      if (key === 'ab_recon_roles' && Array.isArray(parsed)) {
-        const needsUpdate = parsed.some(r => !r.description || r.description === 'Hi' || r.description.includes('Full access to reconciliation'));
-        if (needsUpdate) {
+      // Migration: Check if permissions data is in old format (missing new modules)
+      if (key === 'ab_recon_permissions' && Array.isArray(parsed)) {
+        // Simple check to see if it's an object now
+        localStorage.removeItem(key);
+        return defaultValue;
+      }
+      if (key === 'ab_recon_permissions' && typeof parsed === 'object') {
+        const hasNewModule = Object.keys(parsed).includes('Reports');
+        if (!hasNewModule) {
           localStorage.removeItem(key);
           return defaultValue;
         }
@@ -54,19 +59,34 @@ export const AppProvider = ({ children }) => {
         perms[mod][role.name] = role.name === 'Admin';
       });
     });
+    // Operational Permissions
     perms['Dashboard']['Ops_Maker'] = true;
     perms['Dashboard']['Ops_Checker'] = true;
     perms['Dashboard']['CS User'] = true;
+    perms['Dashboard']['BU_User'] = true;
+
+    perms['Recon Masters']['Ops_Maker'] = true;
+    perms['Run Recon']['Ops_Maker'] = true;
+    
     perms['Run History']['Admin'] = true;
     perms['Run History']['Ops_Maker'] = true;
     perms['Run History']['Ops_Checker'] = true;
     perms['Run History']['CS User'] = true;
+    perms['Run History']['BU_User'] = true;
+
+    perms['Exception Queue']['Ops_Maker'] = true;
+    perms['Exception Queue']['Ops_Checker'] = true;
+    
     perms['AI Suggestions']['Admin'] = true;
     perms['AI Suggestions']['Ops_Maker'] = true;
+    perms['AI Suggestions']['Ops_Checker'] = true;
+
     perms['Reports']['Admin'] = true;
     perms['Reports']['Ops_Maker'] = true;
     perms['Reports']['Ops_Checker'] = true;
     perms['Reports']['CS User'] = true;
+    perms['Reports']['BU_User'] = true;
+
     return perms;
   };
 
