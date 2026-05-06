@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Play, Terminal, Cpu, Database, ShieldCheck, CheckCircle2, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
 
 const RunRecon = () => {
-  const { addNotification, logAudit, setRunHistory, masters } = useApp();
+  const { addNotification, logAudit, setRunHistory, masters, user } = useApp();
   const [selectedProduct, setSelectedProduct] = useState('');
   const [isRunning, setIsRunning] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
@@ -11,9 +11,8 @@ const RunRecon = () => {
   const [engineStatus, setEngineStatus] = useState('STANDBY');
   const [stepIndex, setStepIndex] = useState(-1);
   const terminalRef = useRef(null);
-  const isFinalizing = useRef(false);
+  const finishTriggered = useRef(false);
 
-  // Auto-scroll terminal
   useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
@@ -34,64 +33,71 @@ const RunRecon = () => {
     { msg: '> Recon Cycle Terminated. Exit Code: 0', delay: 300 }
   ];
 
-  // Robust Sequential Controller
   useEffect(() => {
     let timer;
     if (isRunning && stepIndex < sequence.length) {
-      const currentDelay = stepIndex === -1 ? 0 : sequence[stepIndex].delay;
+      const delay = stepIndex === -1 ? 0 : sequence[stepIndex].delay;
       timer = setTimeout(() => {
         if (stepIndex === -1) {
-          setTerminalLogs([`> Starting Recon Engine for [${selectedProduct || 'Unknown'}]...`]);
+          setTerminalLogs([`> Starting Recon Engine for [${selectedProduct || 'System'}]...`]);
           setStepIndex(0);
         } else {
           setTerminalLogs(prev => [...prev, sequence[stepIndex].msg]);
           setStepIndex(prev => prev + 1);
         }
-      }, currentDelay);
-    } else if (isRunning && stepIndex === sequence.length && !isFinalizing.current) {
-      // Finalize exactly once
-      isFinalizing.current = true;
-      
-      const finalize = () => {
-        const runId = `RUN-${Math.floor(Math.random() * 900) + 100}`;
-        const prodName = selectedProduct || 'General Master';
-        const newRun = { 
-          id: runId, 
-          product: prodName, 
-          status: 'Completed', 
-          matched: '4,218', 
-          exceptions: '2', 
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-          date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2026' })
-        };
-        
-        setRunHistory(prev => Array.isArray(prev) ? [newRun, ...prev] : [newRun]);
-        addNotification({ title: 'Build Success', message: `${prodName} cycle verified.` });
-        logAudit('Execution Success', 'Console', `Batch ${runId} finished successfully.`, 'Auto');
-        
-        setIsRunning(false);
-        setIsFinished(true);
-        setEngineStatus('COMPLETED');
-      };
-
-      finalize();
+      }, delay);
+    } else if (isRunning && stepIndex === sequence.length && !finishTriggered.current) {
+      finishTriggered.current = true;
+      // Use a slight delay to ensure the last log is rendered before state transition
+      setTimeout(() => {
+        finalizeBuild();
+      }, 500);
     }
     return () => clearTimeout(timer);
   }, [isRunning, stepIndex, selectedProduct]);
 
-  const startEngine = (e) => {
-    if (e) e.preventDefault();
+  const finalizeBuild = () => {
+    try {
+      const runId = `RUN-${Math.floor(Math.random() * 900) + 100}`;
+      const newRun = { 
+        id: runId, 
+        product: selectedProduct || 'General Master', 
+        status: 'Completed', 
+        matched: '4,218', 
+        exceptions: '2', 
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2026' })
+      };
+      
+      // Batch context updates safely
+      setRunHistory(prev => Array.isArray(prev) ? [newRun, ...prev] : [newRun]);
+      addNotification({ title: 'Build Success', message: `${selectedProduct} cycle verified.` });
+      logAudit('Execution Success', 'Console', `Batch ${runId} finished successfully.`, 'Auto');
+      
+      setIsRunning(false);
+      setIsFinished(true);
+      setEngineStatus('COMPLETED');
+    } catch (err) {
+      console.error('Finalization Failure:', err);
+      setIsRunning(false);
+      setEngineStatus('ERROR');
+    }
+  };
+
+  const startEngine = () => {
     if (!selectedProduct) {
       setTerminalLogs(prev => [...prev, '> ERROR: No Product Master selected.']);
       return;
     }
-    isFinalizing.current = false;
+    finishTriggered.current = false;
     setIsFinished(false);
     setStepIndex(-1);
     setIsRunning(true);
     setEngineStatus('EXECUTING');
-    logAudit('Manual Run Started', 'Console', `Engine initialized for ${selectedProduct}`, 'System');
+    logAudit('Manual Run Triggered', 'Console', `Engine initialized for ${selectedProduct}`, 'System');
   };
+
+  if (!user) return null;
 
   return (
     <div className="main-content animate-reveal">
@@ -109,8 +115,8 @@ const RunRecon = () => {
       </div>
 
       <div className="grid-2-1" style={{ gap: '32px' }}>
-        <div className="card" style={{ padding: '40px', display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '900', marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div className="card" style={{ padding: '32px', display: 'flex', flexDirection: 'column' }}>
+          <h3 style={{ fontSize: '18px', fontWeight: '900', marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '12px', color: '#1E293B' }}>
              <Database size={22} color="var(--primary)" /> CONFIGURATION
           </h3>
           
@@ -120,7 +126,7 @@ const RunRecon = () => {
               className="form-control" 
               value={selectedProduct}
               onChange={(e) => setSelectedProduct(e.target.value)}
-              style={{ height: '64px', borderRadius: '14px', fontSize: '16px', border: '2px solid #E2E8F0' }}
+              style={{ height: '56px', borderRadius: '12px', fontSize: '15px' }}
               disabled={isRunning}
             >
               <option value="">-- Select Master --</option>
@@ -132,26 +138,26 @@ const RunRecon = () => {
 
           <div style={{ flex: 1 }}>
             {isFinished ? (
-              <div style={{ padding: '24px', background: '#ECFDF5', borderRadius: '24px', textAlign: 'center', border: '2px solid #D1FAE5' }} className="animate-fade-in">
-                <CheckCircle size={40} color="#10B981" style={{ margin: '0 auto 12px' }} />
+              <div style={{ padding: '24px', background: '#ECFDF5', borderRadius: '20px', textAlign: 'center', border: '2px solid #D1FAE5' }} className="animate-fade-in">
+                <CheckCircle size={32} color="#10B981" style={{ margin: '0 auto 12px' }} />
                 <h4 style={{ color: '#064E3B', fontWeight: '900', fontSize: '16px', marginBottom: '4px' }}>BUILD SUCCESSFUL</h4>
-                <p style={{ color: '#065F46', fontSize: '12px' }}>Reconciliation archived.</p>
+                <p style={{ color: '#065F46', fontSize: '12px' }}>Archived to global repository.</p>
                 <button 
                   onClick={() => setIsFinished(false)}
-                  style={{ marginTop: '16px', background: '#059669', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '13px' }}
+                  style={{ marginTop: '16px', background: '#059669', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '12px' }}
                 >
-                  Run New Cycle
+                  Reset Console
                 </button>
               </div>
             ) : (
               <div style={{ padding: '24px', background: '#F8FAFC', borderRadius: '18px', border: '1px solid #E2E8F0', marginBottom: '32px' }}>
                 <h4 style={{ fontSize: '13px', fontWeight: '900', color: '#1E293B', marginBottom: '16px' }}>System Pre-Check</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#475569' }}>
-                    <CheckCircle2 size={16} color="#10B981" /> SFTP Gateway Online
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: '#475569' }}>
+                    <CheckCircle2 size={14} color="#10B981" /> SFTP Gateway Online
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '13px', color: '#475569' }}>
-                    <CheckCircle2 size={16} color="#10B981" /> Forensic Vault Synced
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: '#475569' }}>
+                    <CheckCircle2 size={14} color="#10B981" /> Forensic Vault Synced
                   </div>
                 </div>
               </div>
@@ -163,22 +169,12 @@ const RunRecon = () => {
               className="btn btn-primary" 
               onClick={startEngine}
               disabled={isRunning}
-              style={{ 
-                width: '100%', 
-                height: '60px', // Made smaller
-                fontSize: '16px', // Adjusted text size
-                fontWeight: '900', 
-                borderRadius: '14px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '12px'
-              }}
+              style={{ width: '100%', height: '52px', fontSize: '15px', fontWeight: '900', borderRadius: '12px' }}
             >
               {isRunning ? (
-                <><RefreshCw size={20} className="animate-spin" /> EXECUTING...</>
+                <><RefreshCw size={18} className="animate-spin" /> EXECUTING...</>
               ) : (
-                <><Play size={20} fill="white" /> TRIGGER ENGINE</>
+                <><Play size={18} fill="white" /> TRIGGER ENGINE</>
               )}
             </button>
           )}
@@ -193,20 +189,20 @@ const RunRecon = () => {
             display: 'flex',
             flexDirection: 'column',
             border: '8px solid #1E293B',
-            boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.5)'
+            boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.6)'
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '18px' }}>
               <div style={{ background: 'var(--gold)', padding: '8px', borderRadius: '8px' }}>
-                <Terminal size={20} color="#0F172A" />
+                <Terminal size={18} color="#0F172A" />
               </div>
               <div>
-                <span style={{ color: 'white', fontSize: '13px', fontWeight: '900', letterSpacing: '2px', display: 'block' }}>RECON CONSOLE V4.0</span>
+                <span style={{ color: 'white', fontSize: '12px', fontWeight: '900', letterSpacing: '2px', display: 'block' }}>RECON CONSOLE V4.0</span>
               </div>
               <div style={{ flex: 1 }}></div>
-              <div style={{ display: 'flex', gap: '10px' }}>
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#EF4444' }}></div>
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#F59E0B' }}></div>
-                <div style={{ width: '12px', height: '12px', borderRadius: '50%', background: '#10B981' }}></div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#EF4444' }}></div>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#F59E0B' }}></div>
+                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10B981' }}></div>
               </div>
             </div>
             
@@ -231,11 +227,6 @@ const RunRecon = () => {
               ))}
               {isRunning && <div className="animate-pulse" style={{ display: 'inline-block', width: '10px', height: '18px', background: 'var(--gold)', verticalAlign: 'middle', marginLeft: '6px' }}></div>}
             </div>
-          </div>
-          
-          <div className="card" style={{ marginTop: '24px', padding: '24px', background: '#FEF2F2', border: '2px solid #FEE2E2', display: 'flex', gap: '16px', alignItems: 'center', borderRadius: '18px' }}>
-            <AlertTriangle size={24} color="#DC2626" />
-            <p style={{ fontSize: '13px', color: '#991B1B', fontWeight: '800' }}>Forensic Warning: Manual override in progress.</p>
           </div>
         </div>
       </div>

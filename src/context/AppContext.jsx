@@ -152,15 +152,15 @@ export const AppProvider = ({ children }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   // Sync with LocalStorage
-  useEffect(() => { localStorage.setItem('ab_recon_roles', JSON.stringify(roles)); }, [roles]);
-  useEffect(() => { localStorage.setItem('ab_recon_permissions', JSON.stringify(permissions)); }, [permissions]);
-  useEffect(() => { localStorage.setItem('ab_recon_masters', JSON.stringify(masters)); }, [masters]);
-  useEffect(() => { localStorage.setItem('ab_recon_exceptions', JSON.stringify(exceptions)); }, [exceptions]);
-  useEffect(() => { localStorage.setItem('ab_recon_notifications', JSON.stringify(notifications)); }, [notifications]);
-  useEffect(() => { localStorage.setItem('ab_recon_ai_suggestions', JSON.stringify(aiSuggestions)); }, [aiSuggestions]);
-  useEffect(() => { localStorage.setItem('ab_recon_users', JSON.stringify(users)); }, [users]);
-  useEffect(() => { localStorage.setItem('ab_recon_audit', JSON.stringify(auditLogs)); }, [auditLogs]);
-  useEffect(() => { localStorage.setItem('ab_recon_history', JSON.stringify(runHistory)); }, [runHistory]);
+  useEffect(() => { try { localStorage.setItem('ab_recon_roles', JSON.stringify(roles)); } catch (e) {} }, [roles]);
+  useEffect(() => { try { localStorage.setItem('ab_recon_permissions', JSON.stringify(permissions)); } catch (e) {} }, [permissions]);
+  useEffect(() => { try { localStorage.setItem('ab_recon_masters', JSON.stringify(masters)); } catch (e) {} }, [masters]);
+  useEffect(() => { try { localStorage.setItem('ab_recon_exceptions', JSON.stringify(exceptions)); } catch (e) {} }, [exceptions]);
+  useEffect(() => { try { localStorage.setItem('ab_recon_notifications', JSON.stringify(notifications)); } catch (e) {} }, [notifications]);
+  useEffect(() => { try { localStorage.setItem('ab_recon_ai_suggestions', JSON.stringify(aiSuggestions)); } catch (e) {} }, [aiSuggestions]);
+  useEffect(() => { try { localStorage.setItem('ab_recon_users', JSON.stringify(users)); } catch (e) {} }, [users]);
+  useEffect(() => { try { localStorage.setItem('ab_recon_audit', JSON.stringify(auditLogs)); } catch (e) {} }, [auditLogs]);
+  useEffect(() => { try { localStorage.setItem('ab_recon_history', JSON.stringify(runHistory)); } catch (e) {} }, [runHistory]);
 
   const logAudit = (action, module, detail, type = 'System') => {
     const newLog = {
