@@ -17,10 +17,13 @@ export const AppProvider = ({ children }) => {
         localStorage.removeItem(key);
         return defaultValue;
       }
-      // Migration: Check if roles data is in old format (missing description)
-      if (key === 'ab_recon_roles' && Array.isArray(parsed) && parsed.length > 0 && !parsed[0].description) {
-        localStorage.removeItem(key);
-        return defaultValue;
+      // Migration: Check if roles data is in old format (missing description or using generic fallback)
+      if (key === 'ab_recon_roles' && Array.isArray(parsed)) {
+        const needsUpdate = parsed.some(r => !r.description || r.description === 'Hi' || r.description.includes('Full access to reconciliation'));
+        if (needsUpdate) {
+          localStorage.removeItem(key);
+          return defaultValue;
+        }
       }
       return parsed;
     } catch {
