@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { Play, Terminal, Cpu, Database, ShieldCheck, CheckCircle2, ChevronRight, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Play, Terminal, Cpu, Database, ShieldCheck, CheckCircle2, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
 
 const RunRecon = () => {
   const { addNotification, logAudit, setRunHistory, masters } = useApp();
@@ -12,6 +12,7 @@ const RunRecon = () => {
   const [stepIndex, setStepIndex] = useState(-1);
   const terminalRef = useRef(null);
 
+  // Auto-scroll terminal
   useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
@@ -32,10 +33,11 @@ const RunRecon = () => {
     { msg: '> Recon Cycle Terminated. Exit Code: 0', delay: 300 }
   ];
 
+  // Robust Sequential Controller
   useEffect(() => {
     let timer;
     if (isRunning && stepIndex < sequence.length) {
-      const delay = stepIndex === -1 ? 0 : sequence[stepIndex].delay;
+      const currentDelay = stepIndex === -1 ? 0 : sequence[stepIndex].delay;
       timer = setTimeout(() => {
         if (stepIndex === -1) {
           setTerminalLogs([`> Starting Recon Engine for [${selectedProduct}]...`]);
@@ -44,14 +46,33 @@ const RunRecon = () => {
           setTerminalLogs(prev => [...prev, sequence[stepIndex].msg]);
           setStepIndex(prev => prev + 1);
         }
-      }, delay);
+      }, currentDelay);
     } else if (isRunning && stepIndex === sequence.length) {
-      handleFinalize();
+      // Direct Finalization (No timeouts here to prevent race conditions)
+      setIsRunning(false);
+      setIsFinished(true);
+      setEngineStatus('COMPLETED');
+      
+      const runId = `RUN-${Math.floor(Math.random() * 900) + 100}`;
+      const newRun = { 
+        id: runId, 
+        product: selectedProduct, 
+        status: 'Completed', 
+        matched: '4,218', 
+        exceptions: '2', 
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2026' })
+      };
+      
+      setRunHistory(prev => Array.isArray(prev) ? [newRun, ...prev] : [newRun]);
+      addNotification({ title: 'Build Success', message: `${selectedProduct} cycle verified.` });
+      logAudit('Execution Success', 'Console', `Batch ${runId} finished successfully.`, 'Auto');
     }
     return () => clearTimeout(timer);
-  }, [isRunning, stepIndex]);
+  }, [isRunning, stepIndex, selectedProduct, sequence.length]);
 
-  const startEngine = () => {
+  const startEngine = (e) => {
+    if (e) e.preventDefault(); // Prevent any form submission reloads
     if (!selectedProduct) {
       setTerminalLogs(prev => [...prev, '> ERROR: No Product Master selected.']);
       return;
@@ -61,33 +82,6 @@ const RunRecon = () => {
     setIsRunning(true);
     setEngineStatus('EXECUTING');
     logAudit('Manual Run Started', 'Console', `Engine initialized for ${selectedProduct}`, 'System');
-  };
-
-  const handleFinalize = () => {
-    // Only run once
-    setIsRunning(false);
-    setIsFinished(true);
-    setEngineStatus('COMPLETED');
-    
-    const runId = `RUN-${Math.floor(Math.random() * 900) + 100}`;
-    const newRun = { 
-      id: runId, 
-      product: selectedProduct, 
-      status: 'Completed', 
-      matched: '4,218', 
-      exceptions: '2', 
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2026' })
-    };
-    
-    // Safety check for state updates
-    try {
-      setRunHistory(prev => Array.isArray(prev) ? [newRun, ...prev] : [newRun]);
-      addNotification({ title: 'Build Success', message: `${selectedProduct} cycle verified.` });
-      logAudit('Execution Success', 'Console', `Batch ${runId} finished successfully.`, 'Auto');
-    } catch (err) {
-      console.error('Finalization Error:', err);
-    }
   };
 
   return (
@@ -132,12 +126,12 @@ const RunRecon = () => {
               <div style={{ padding: '32px', background: '#ECFDF5', borderRadius: '24px', textAlign: 'center', border: '2px solid #D1FAE5' }} className="animate-fade-in">
                 <CheckCircle size={48} color="#10B981" style={{ margin: '0 auto 16px' }} />
                 <h4 style={{ color: '#064E3B', fontWeight: '900', fontSize: '18px', marginBottom: '8px' }}>BUILD SUCCESSFUL</h4>
-                <p style={{ color: '#065F46', fontSize: '14px' }}>Reconciliation cycle for {selectedProduct} has been archived successfully.</p>
+                <p style={{ color: '#065F46', fontSize: '14px' }}>Execution cycle for {selectedProduct} completed.</p>
                 <button 
                   onClick={() => setIsFinished(false)}
-                  style={{ marginTop: '20px', background: '#059669', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '700' }}
+                  style={{ marginTop: '20px', background: '#059669', color: 'white', border: 'none', padding: '12px 24px', borderRadius: '10px', cursor: 'pointer', fontWeight: '700' }}
                 >
-                  Run New Cycle
+                  Return to Dashboard
                 </button>
               </div>
             ) : (
