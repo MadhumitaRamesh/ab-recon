@@ -10,6 +10,8 @@ import Roles from './pages/Roles';
 import Users from './pages/Users';
 import RunRecon from './pages/RunRecon';
 import RunHistory from './pages/RunHistory';
+import AiSuggestions from './pages/AiSuggestions';
+import Reports from './pages/Reports';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 
@@ -27,16 +29,12 @@ function App() {
   useEffect(() => {
     const handleMouseOver = (e) => {
       const card = e.target.closest('.card');
-      if (card) {
-        card.classList.add('js-hover');
-      }
+      if (card) card.classList.add('js-hover');
     };
 
     const handleMouseOut = (e) => {
       const card = e.target.closest('.card');
-      if (card) {
-        card.classList.remove('js-hover');
-      }
+      if (card) card.classList.remove('js-hover');
     };
 
     document.addEventListener('mouseover', handleMouseOver);
@@ -59,6 +57,8 @@ function App() {
       case 'runs': return <RunRecon />;
       case 'history': return <RunHistory />;
       case 'exceptions': return <ExceptionQueue />;
+      case 'suggestions': return <AiSuggestions />;
+      case 'reports': return <Reports />;
       case 'audit': return <AuditLog />;
       case 'users': return <Users />;
       case 'roles': return <Roles />;

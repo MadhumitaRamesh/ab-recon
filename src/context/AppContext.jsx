@@ -42,6 +42,11 @@ export const AppProvider = ({ children }) => {
     perms['Run History']['Ops_Maker'] = true;
     perms['Run History']['Ops_Checker'] = true;
     perms['Run History']['CS User'] = true;
+    perms['AI Suggestions']['Admin'] = true;
+    perms['AI Suggestions']['Ops_Maker'] = true;
+    perms['Reports']['Admin'] = true;
+    perms['Reports']['Ops_Maker'] = true;
+    perms['Reports']['Ops_Checker'] = true;
     perms['Reports']['CS User'] = true;
     return perms;
   };
