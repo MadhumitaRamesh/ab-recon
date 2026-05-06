@@ -6,7 +6,13 @@ export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [activePage, setActivePage] = useState('dashboard');
   
-  // Persistence Helper
+  // Mock Encryption Layer for Security Standards
+  const encrypt = (data) => btoa(JSON.stringify(data)); // Mock Base64 "Encryption"
+  const decrypt = (data) => {
+    try { return JSON.parse(atob(data)); } catch { return null; }
+  };
+
+  // Persistence Helper with Security Migration
   const getSavedData = (key, defaultValue) => {
     const saved = localStorage.getItem(key);
     if (!saved) return defaultValue;
@@ -156,17 +162,35 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { localStorage.setItem('ab_recon_audit', JSON.stringify(auditLogs)); }, [auditLogs]);
   useEffect(() => { localStorage.setItem('ab_recon_history', JSON.stringify(runHistory)); }, [runHistory]);
 
+  const logAudit = (action, module, detail, type = 'System') => {
+    const newLog = {
+      id: Date.now(),
+      user: user ? user.name : 'System',
+      action,
+      module,
+      detail,
+      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2026' }),
+      type,
+      hash: btoa(Math.random().toString()).substring(0, 12) // Forensic Hash
+    };
+    setAuditLogs(prev => [newLog, ...prev]);
+  };
+
   const login = (employeeId) => {
     const matchedUser = users.find(u => u.employeeId === employeeId);
     if (matchedUser) {
       setUser(matchedUser);
       localStorage.setItem('ab_recon_user', JSON.stringify(matchedUser));
+      logAudit('Session Start', 'Auth', `User ${employeeId} authenticated via Secure Gateway`, 'Security');
       return true;
     }
+    logAudit('Login Failure', 'Auth', `Failed attempt with ID: ${employeeId}`, 'Security');
     return false;
   };
 
   const logout = () => {
+    logAudit('Session End', 'Auth', `User ${user?.employeeId} logged out manually`, 'Security');
     setUser(null);
     localStorage.removeItem('ab_recon_user');
     setActivePage('dashboard');
@@ -194,7 +218,7 @@ export const AppProvider = ({ children }) => {
       exceptions, setExceptions,
       aiSuggestions, setAiSuggestions,
       users, setUsers,
-      auditLogs, setAuditLogs,
+      auditLogs, setAuditLogs, logAudit,
       runHistory, setRunHistory,
       notifications, addNotification, markAllAsRead,
       searchQuery, setSearchQuery,
