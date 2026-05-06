@@ -194,10 +194,18 @@ export const AppProvider = ({ children }) => {
   };
 
   const logout = () => {
-    logAudit('Session End', 'Auth', `User ${user?.employeeId} logged out manually`, 'Security');
-    setUser(null);
+    try {
+      logAudit('Session End', 'Auth', 'User session terminated manually', 'Security');
+    } catch (e) {
+      console.warn('Audit log failed during logout', e);
+    }
     localStorage.removeItem('ab_recon_user');
+    setUser(null);
     setActivePage('dashboard');
+    // Force a clean state refresh
+    setTimeout(() => {
+      window.location.hash = '';
+    }, 10);
   };
 
   const addMaster = (master) => {
