@@ -1,13 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { UserPlus, Search, Edit3, Trash2, Filter, X, Mail, Shield, CheckCircle } from 'lucide-react';
+import { UserPlus, Search, Edit3, Trash2, X, Hash, Shield, CheckCircle, Save } from 'lucide-react';
 
 const Users = () => {
   const { users, setUsers, addNotification } = useApp();
   const [showForm, setShowForm] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('All');
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'Ops_Maker', status: 'Active' });
+  const [formData, setFormData] = useState({ name: '', employeeId: '', role: 'Ops_Maker', status: 'Active' });
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -15,24 +16,40 @@ const Users = () => {
   }, []);
 
   const filteredUsers = users.filter(u => {
-    const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = u.name.toLowerCase().includes(searchQuery.toLowerCase()) || u.employeeId.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRole = filterRole === 'All' || u.role === filterRole;
     return matchesSearch && matchesRole;
   });
 
-  const handleAddUser = (e) => {
+  const handleOpenAdd = () => {
+    setEditingId(null);
+    setFormData({ name: '', employeeId: '', role: 'Ops_Maker', status: 'Active' });
+    setShowForm(true);
+  };
+
+  const handleOpenEdit = (user) => {
+    setEditingId(user.id);
+    setFormData({ name: user.name, employeeId: user.employeeId, role: user.role, status: user.status });
+    setShowForm(true);
+  };
+
+  const handleSubmit = (e) => {
     e.preventDefault();
-    const id = Date.now();
-    setUsers([...users, { ...newUser, id }]);
-    addNotification({ title: 'User Created', message: `Identity ${newUser.name} has been added to the platform.` });
+    if (editingId) {
+      setUsers(users.map(u => u.id === editingId ? { ...formData, id: editingId } : u));
+      addNotification({ title: 'Profile Updated', message: `Identity ${formData.name} (${formData.employeeId}) has been modified.` });
+    } else {
+      const id = Date.now();
+      setUsers([...users, { ...formData, id }]);
+      addNotification({ title: 'User Created', message: `Identity ${formData.name} has been added to the platform.` });
+    }
     setShowForm(false);
-    setNewUser({ name: '', email: '', role: 'Ops_Maker', status: 'Active' });
   };
 
   const handleDelete = (id, name) => {
     if (window.confirm(`Are you sure you want to revoke access for ${name}?`)) {
       setUsers(users.filter(u => u.id !== id));
-      addNotification({ title: 'Access Revoked', message: `User ${name} has been removed from the system.` });
+      addNotification({ title: 'Access Revoked', message: `User ${name} removed from system.` });
     }
   };
 
@@ -40,11 +57,11 @@ const Users = () => {
     <div className={`main-content ${isLoaded ? 'animate-reveal' : ''}`} style={{ opacity: isLoaded ? 1 : 0 }}>
       <div style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px' }}>
         <div style={{ flex: '1', minWidth: '300px' }}>
-          <h1 style={{ fontSize: 'clamp(24px, 5vw, 32px)', color: '#0F172A', fontWeight: '800' }}>User Management</h1>
-          <p style={{ color: '#64748B', fontSize: '16px', marginTop: '6px' }}>Manage administrative and operational identities for ABC Reconciliation.</p>
+          <h1 style={{ fontSize: 'clamp(24px, 5vw, 32px)', color: '#0F172A', fontWeight: '800' }}>Identity Management</h1>
+          <p style={{ color: '#64748B', fontSize: '16px', marginTop: '6px' }}>Manage and provision employee access for the AB Recon platform.</p>
         </div>
-        <button className="btn btn-primary" onClick={() => setShowForm(true)} style={{ height: '52px', minWidth: '200px' }}>
-          <UserPlus size={18} style={{ marginRight: '10px' }} /> Add New User
+        <button className="btn btn-primary" onClick={handleOpenAdd} style={{ height: '52px', minWidth: '220px' }}>
+          <UserPlus size={18} style={{ marginRight: '10px' }} /> Provision New User
         </button>
       </div>
 
@@ -54,7 +71,7 @@ const Users = () => {
           <input 
             type="text" 
             className="form-control" 
-            placeholder="Search by name, employee ID or email..." 
+            placeholder="Search by name or employee ID..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ paddingLeft: '50px', height: '52px' }}
@@ -70,6 +87,7 @@ const Users = () => {
           <option value="Admin">Admin</option>
           <option value="Ops_Maker">Ops Maker</option>
           <option value="Ops_Checker">Ops Checker</option>
+          <option value="CS User">CS User</option>
         </select>
       </div>
 
@@ -77,21 +95,21 @@ const Users = () => {
         <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px' }}>
           <div className="card animate-reveal" style={{ maxWidth: '500px', width: '100%', padding: '0', marginBottom: 0 }}>
             <div style={{ padding: '24px 32px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 style={{ fontSize: '18px', fontWeight: '800' }}>Create User Identity</h3>
+              <h3 style={{ fontSize: '18px', fontWeight: '800' }}>{editingId ? 'Modify Identity' : 'Provision Identity'}</h3>
               <button onClick={() => setShowForm(false)} style={{ background: 'transparent', border: 'none', cursor: 'pointer' }}><X size={24} /></button>
             </div>
-            <form onSubmit={handleAddUser} style={{ padding: '32px' }}>
+            <form onSubmit={handleSubmit} style={{ padding: '32px' }}>
               <div className="form-group">
                 <label className="form-label">Full Name</label>
-                <input type="text" className="form-control" value={newUser.name} onChange={(e) => setNewUser({...newUser, name: e.target.value})} required />
+                <input type="text" className="form-control" value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} required />
               </div>
               <div className="form-group">
-                <label className="form-label">Email Address</label>
-                <input type="email" className="form-control" value={newUser.email} onChange={(e) => setNewUser({...newUser, email: e.target.value})} required />
+                <label className="form-label">Employee ID</label>
+                <input type="text" className="form-control" value={formData.employeeId} onChange={(e) => setFormData({...formData, employeeId: e.target.value.toUpperCase()})} required placeholder="e.g. ABC001" />
               </div>
               <div className="form-group">
-                <label className="form-label">System Role</label>
-                <select className="form-control" value={newUser.role} onChange={(e) => setNewUser({...newUser, role: e.target.value})}>
+                <label className="form-label">Assigned Role</label>
+                <select className="form-control" value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})}>
                   <option value="Ops_Maker">Ops Maker</option>
                   <option value="Ops_Checker">Ops Checker</option>
                   <option value="Admin">Admin</option>
@@ -99,7 +117,9 @@ const Users = () => {
                 </select>
               </div>
               <div style={{ display: 'flex', gap: '16px', marginTop: '32px' }}>
-                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>Confirm Creation</button>
+                <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
+                  {editingId ? <><Save size={18} style={{ marginRight: '8px' }} /> Save Changes</> : 'Confirm Provisioning'}
+                </button>
                 <button type="button" className="btn btn-outline" style={{ flex: 1 }} onClick={() => setShowForm(false)}>Cancel</button>
               </div>
             </form>
@@ -112,11 +132,11 @@ const Users = () => {
           <table className="data-table">
             <thead>
               <tr>
-                <th>Identity</th>
-                <th>Contact</th>
-                <th>Module Role</th>
+                <th>Employee Identity</th>
+                <th>Employee ID</th>
+                <th>System Role</th>
                 <th>Status</th>
-                <th>Actions</th>
+                <th>Operations</th>
               </tr>
             </thead>
             <tbody>
@@ -131,13 +151,13 @@ const Users = () => {
                     </div>
                   </td>
                   <td>
-                    <div style={{ fontSize: '13px', color: '#475569', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Mail size={14} color="#94A3B8" /> {u.email}
+                    <div style={{ fontSize: '13px', color: '#1E293B', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '700' }}>
+                      <Hash size={14} color="#94A3B8" /> {u.employeeId}
                     </div>
                   </td>
                   <td>
-                    <span style={{ fontWeight: '700', fontSize: '13px', background: '#F8FAFC', padding: '6px 12px', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
-                      {u.role}
+                    <span style={{ fontWeight: '700', fontSize: '13px', background: '#F8FAFC', padding: '6px 12px', borderRadius: '8px', border: '1px solid #E2E8F0', color: 'var(--primary)' }}>
+                      {u.role.replace('_', ' ')}
                     </span>
                   </td>
                   <td>
@@ -147,8 +167,12 @@ const Users = () => {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '16px' }}>
-                      <Edit3 size={18} color="#64748B" style={{ cursor: 'pointer' }} />
-                      <Trash2 size={18} color="#DC2626" style={{ cursor: 'pointer' }} onClick={() => handleDelete(u.id, u.name)} />
+                      <button onClick={() => handleOpenEdit(u)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748B' }}>
+                        <Edit3 size={18} />
+                      </button>
+                      <button onClick={() => handleDelete(u.id, u.name)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#DC2626' }}>
+                        <Trash2 size={18} />
+                      </button>
                     </div>
                   </td>
                 </tr>

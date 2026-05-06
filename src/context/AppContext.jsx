@@ -71,9 +71,9 @@ export const AppProvider = ({ children }) => {
 
   // User Management Persistence
   const [users, setUsers] = useState(() => getSavedData('ab_recon_users', [
-    { id: 1, name: 'Admin_SS417', email: 'admin@ab.com', role: 'Admin', status: 'Active' },
-    { id: 2, name: 'Suresh K', email: 'suresh@ab.com', role: 'Ops_Maker', status: 'Active' },
-    { id: 3, name: 'Meera N', email: 'meera@ab.com', role: 'Ops_Checker', status: 'Active' },
+    { id: 1, name: 'Admin User', employeeId: 'ABC001', role: 'Admin', status: 'Active' },
+    { id: 2, name: 'Suresh K', employeeId: 'ABC002', role: 'Ops_Maker', status: 'Active' },
+    { id: 3, name: 'Meera N', employeeId: 'ABC003', role: 'Ops_Checker', status: 'Active' },
   ]));
 
   // Notifications State
@@ -101,9 +101,14 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { localStorage.setItem('ab_recon_ai_suggestions', JSON.stringify(aiSuggestions)); }, [aiSuggestions]);
   useEffect(() => { localStorage.setItem('ab_recon_users', JSON.stringify(users)); }, [users]);
 
-  const login = (userData) => {
-    setUser(userData);
-    localStorage.setItem('ab_recon_user', JSON.stringify(userData));
+  const login = (employeeId) => {
+    const matchedUser = users.find(u => u.employeeId === employeeId);
+    if (matchedUser) {
+      setUser(matchedUser);
+      localStorage.setItem('ab_recon_user', JSON.stringify(matchedUser));
+      return true;
+    }
+    return false;
   };
 
   const logout = () => {
