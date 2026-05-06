@@ -25,11 +25,11 @@ export const AppProvider = ({ children }) => {
 
   // Roles Management
   const [roles, setRoles] = useState(() => getSavedData('ab_recon_roles', [
-    { id: 1, name: 'Admin', status: 'Active' },
-    { id: 2, name: 'Ops_Maker', status: 'Active' },
-    { id: 3, name: 'Ops_Checker', status: 'Active' },
-    { id: 4, name: 'CS User', status: 'Active' },
-    { id: 5, name: 'BU_User', status: 'Active' },
+    { id: 1, name: 'Admin', description: 'Complete oversight of platform security, identity management, and global configuration.', level: 'System' },
+    { id: 2, name: 'Ops_Maker', description: 'Responsible for data ingestion, reconciliation execution, and initial exception resolution.', level: 'Operational' },
+    { id: 3, name: 'Ops_Checker', description: 'Verification authority for reconciliation results, exception overrides, and audit compliance.', level: 'Operational' },
+    { id: 4, name: 'CS User', description: 'Read-only access for operational reports, transaction lookup, and history analysis.', level: 'Support' },
+    { id: 5, name: 'BU_User', description: 'Business unit specific view for reconciliation performance and summary reports.', level: 'Business' },
   ]));
 
   // Module Access Permissions
