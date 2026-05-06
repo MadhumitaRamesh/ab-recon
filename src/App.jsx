@@ -21,7 +21,12 @@ function App() {
   useEffect(() => {
     const savedUser = localStorage.getItem('ab_recon_user');
     if (savedUser) {
-      setUser(JSON.parse(savedUser));
+      const parsed = JSON.parse(savedUser);
+      if (parsed && parsed.employeeId) {
+        setUser(parsed);
+      } else {
+        localStorage.removeItem('ab_recon_user');
+      }
     }
   }, [setUser]);
 

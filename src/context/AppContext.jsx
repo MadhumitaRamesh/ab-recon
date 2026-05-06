@@ -9,7 +9,18 @@ export const AppProvider = ({ children }) => {
   // Persistence Helper
   const getSavedData = (key, defaultValue) => {
     const saved = localStorage.getItem(key);
-    return saved ? JSON.parse(saved) : defaultValue;
+    if (!saved) return defaultValue;
+    try {
+      const parsed = JSON.parse(saved);
+      // Migration: Check if users data is in old format (missing employeeId)
+      if (key === 'ab_recon_users' && Array.isArray(parsed) && parsed.length > 0 && !parsed[0].employeeId) {
+        localStorage.removeItem(key);
+        return defaultValue;
+      }
+      return parsed;
+    } catch {
+      return defaultValue;
+    }
   };
 
   // Roles Management
