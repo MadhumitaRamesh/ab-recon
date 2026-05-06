@@ -14,20 +14,26 @@ const ModuleAccess = () => {
 
   const togglePermission = (mod, role) => {
     const updated = { ...localPerms };
+    if (!updated[mod]) updated[mod] = {};
     updated[mod][role] = !updated[mod][role];
     setLocalPerms(updated);
   };
 
   const handleSave = () => {
-    setPermissions(localPerms);
-    addNotification({ title: 'Permissions Synced', message: 'The global module access matrix has been updated successfully.' });
+    if (window.confirm('Are you sure you want to apply these permission changes across the entire platform? This will immediately affect all active users.')) {
+      setPermissions(localPerms);
+      addNotification({ title: 'Permissions Synced', message: 'The global module access matrix has been updated successfully.' });
+      alert('Success! Global module permissions have been updated and synchronized with the security matrix.');
+    }
   };
 
   const handleReset = () => {
-    if (window.confirm('Are you sure you want to restore default system permissions? This will override all custom rules.')) {
+    if (window.confirm('CRITICAL ACTION: Do you want to restore factory default permissions? This will override all current custom rules and cannot be undone.')) {
       const defaults = getDefaultPermissions();
       setLocalPerms(defaults);
+      setPermissions(defaults); // Force save to context immediately for reset
       addNotification({ title: 'Defaults Restored', message: 'System permissions have been reset to baseline defaults.' });
+      alert('System baseline permissions have been restored successfully.');
     }
   };
 
@@ -55,7 +61,7 @@ const ModuleAccess = () => {
               <tr>
                 <th style={{ position: 'sticky', left: 0, zIndex: 10, background: '#F8FAFC', borderRight: '2px solid var(--border-light)' }}>Application Module</th>
                 {roles.map(role => (
-                  <th key={role.id} style={{ textAlign: 'center', minWidth: '120px' }}>
+                  <th key={role.id} style={{ textAlign: 'center', minWidth: '140px' }}>
                     <div style={{ fontSize: '11px', color: '#64748B', marginBottom: '4px' }}>ROLE</div>
                     {role.name.replace('_', ' ')}
                   </th>
@@ -107,7 +113,7 @@ const ModuleAccess = () => {
 
       <div className="card" style={{ marginTop: '32px', padding: '24px', background: '#FEFCE8', border: '1px solid #FEF08A', display: 'flex', gap: '20px', alignItems: 'center' }}>
         <AlertCircle size={24} color="#A16207" />
-        <p style={{ fontSize: '14px', color: '#854D0E', fontWeight: '600' }}>Warning: Revoking access to the 'Dashboard' or 'Identity' modules for Admin roles may lead to platform lockout. Always verify before saving changes.</p>
+        <p style={{ fontSize: '14px', color: '#854D0E', fontWeight: '600' }}>Warning: Revoking access to the 'Dashboard' or 'Permissions' modules for Admin roles may lead to platform lockout. Always verify the security matrix before saving changes.</p>
       </div>
     </div>
   );
