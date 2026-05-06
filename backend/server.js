@@ -7,22 +7,32 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Database Connection
-const db = mysql.createPool({
-    host: process.env.DB_HOST || 'localhost',
+// Database Connection Configuration
+const dbConfig = {
+    host: process.env.DB_HOST || '127.0.0.1',
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
+    password: process.env.DB_PASSWORD || 'root',
     database: process.env.DB_NAME || 'ab_recon_db',
     waitForConnections: true,
     connectionLimit: 10,
     queueLimit: 0
-});
+};
+
+// Handle Unix Sockets (Common on macOS manual installs)
+if (process.platform === 'darwin') {
+    dbConfig.socketPath = '/tmp/mysql.sock';
+    // Remove host when using socket
+    delete dbConfig.host;
+}
+
+const db = mysql.createPool(dbConfig);
 
 // Verify Connection
 db.getConnection((err, connection) => {
     if (err) {
-        console.error('CRITICAL: MySQL Connection Failed. Ensure MySQL is running and schema.sql is executed.');
+        console.error('CRITICAL: MySQL Connection Failed.');
         console.error('Error Details:', err.message);
+        console.log('Attempted Config:', JSON.stringify({ ...dbConfig, password: '****' }));
     } else {
         console.log('SUCCESS: Connected to Aditya Birla Reconciliation Database (MySQL).');
         connection.release();
@@ -31,7 +41,6 @@ db.getConnection((err, connection) => {
 
 // --- API ENDPOINTS ---
 
-// 1. Roles & Permissions
 app.get('/api/roles', (req, res) => {
     db.query('SELECT * FROM roles', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -46,7 +55,6 @@ app.get('/api/permissions', (req, res) => {
     });
 });
 
-// 2. Product Masters
 app.get('/api/masters', (req, res) => {
     db.query('SELECT * FROM masters', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -63,7 +71,6 @@ app.post('/api/masters', (req, res) => {
     });
 });
 
-// 3. Exception Queue
 app.get('/api/exceptions', (req, res) => {
     db.query('SELECT * FROM exceptions', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -71,7 +78,6 @@ app.get('/api/exceptions', (req, res) => {
     });
 });
 
-// 4. Audit Logs
 app.get('/api/audit-logs', (req, res) => {
     db.query('SELECT * FROM audit_logs ORDER BY id DESC', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -91,7 +97,6 @@ app.post('/api/audit-logs', (req, res) => {
     });
 });
 
-// 5. Run History
 app.get('/api/run-history', (req, res) => {
     db.query('SELECT * FROM run_history ORDER BY run_date DESC, run_time DESC', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -111,7 +116,6 @@ app.post('/api/run-history', (req, res) => {
     });
 });
 
-// 6. Users
 app.get('/api/users', (req, res) => {
     db.query('SELECT * FROM users', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -119,7 +123,6 @@ app.get('/api/users', (req, res) => {
     });
 });
 
-// 7. Notifications
 app.get('/api/notifications', (req, res) => {
     db.query('SELECT * FROM notifications ORDER BY created_at DESC', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -136,7 +139,6 @@ app.post('/api/notifications', (req, res) => {
     });
 });
 
-// 8. AI Suggestions
 app.get('/api/ai-suggestions', (req, res) => {
     db.query('SELECT * FROM ai_suggestions', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
