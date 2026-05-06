@@ -69,6 +69,13 @@ export const AppProvider = ({ children }) => {
     { id: 'TXN-4126', amount: '4,200.00', ref: 'TR-112233', type: 'Reversal', age: '1h', priority: 'Medium', status: 'Unresolved' },
   ]));
 
+  // User Management Persistence
+  const [users, setUsers] = useState(() => getSavedData('ab_recon_users', [
+    { id: 1, name: 'Admin_SS417', email: 'admin@ab.com', role: 'Admin', status: 'Active' },
+    { id: 2, name: 'Suresh K', email: 'suresh@ab.com', role: 'Ops_Maker', status: 'Active' },
+    { id: 3, name: 'Meera N', email: 'meera@ab.com', role: 'Ops_Checker', status: 'Active' },
+  ]));
+
   // Notifications State
   const [notifications, setNotifications] = useState(() => getSavedData('ab_recon_notifications', [
     { id: 1, title: 'Recon Run Success', message: 'BBPS Daily run completed with 12 exceptions.', time: '2h ago', read: false },
@@ -92,6 +99,7 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { localStorage.setItem('ab_recon_exceptions', JSON.stringify(exceptions)); }, [exceptions]);
   useEffect(() => { localStorage.setItem('ab_recon_notifications', JSON.stringify(notifications)); }, [notifications]);
   useEffect(() => { localStorage.setItem('ab_recon_ai_suggestions', JSON.stringify(aiSuggestions)); }, [aiSuggestions]);
+  useEffect(() => { localStorage.setItem('ab_recon_users', JSON.stringify(users)); }, [users]);
 
   const login = (userData) => {
     setUser(userData);
@@ -125,6 +133,7 @@ export const AppProvider = ({ children }) => {
       masters, setMasters, addMaster,
       exceptions, setExceptions,
       aiSuggestions, setAiSuggestions,
+      users, setUsers,
       notifications, addNotification, markAllAsRead,
       searchQuery, setSearchQuery,
       sidebarOpen, setSidebarOpen,
