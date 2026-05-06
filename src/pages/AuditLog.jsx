@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Clock, User, Filter, Download, ShieldCheck, ChevronDown, CheckCircle } from 'lucide-react';
 
 const AuditLog = () => {
-  const { addNotification } = useApp();
+  const { auditLogs, addNotification } = useApp();
   const [filterType, setFilterType] = useState('All');
   const [showFilters, setShowFilters] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -12,15 +12,7 @@ const AuditLog = () => {
     setIsLoaded(true);
   }, []);
 
-  const logsData = [
-    { id: 1, user: 'Admin_SS417', action: 'Update Permission', module: 'Access', detail: 'Changed BBPS role access matrix', time: '10:45 AM', date: '06 May 2026', type: 'Security' },
-    { id: 2, user: 'Ops_MK_02', action: 'Manual Run', module: 'Run Recon', detail: 'Triggered DigiGold Daily API', time: '09:30 AM', date: '06 May 2026', type: 'System' },
-    { id: 3, user: 'System', action: 'Cron Success', module: 'Scheduler', detail: 'Cash Back Daily batch successful', time: '12:00 AM', date: '06 May 2026', type: 'Auto' },
-    { id: 4, user: 'Admin_SS417', action: 'Delete User', module: 'Users', detail: 'Removed inactive user ID: 412', time: '08:15 AM', date: '05 May 2026', type: 'Security' },
-    { id: 5, user: 'Ops_Checker_01', action: 'Accept Match', module: 'Exceptions', detail: 'Resolved TXN-4122 via AI suggestion', time: '11:20 PM', date: '05 May 2026', type: 'System' },
-  ];
-
-  const filteredLogs = logsData.filter(log => 
+  const filteredLogs = auditLogs.filter(log => 
     filterType === 'All' || log.type === filterType
   );
 
@@ -126,16 +118,6 @@ const AuditLog = () => {
               ))}
             </tbody>
           </table>
-        </div>
-      </div>
-
-      <div className="card" style={{ marginTop: '32px', padding: '24px', background: '#ECFDF5', border: '1px solid #D1FAE5', display: 'flex', gap: '20px', alignItems: 'center' }}>
-        <div style={{ background: '#059669', padding: '12px', borderRadius: '12px' }}>
-          <ShieldCheck size={24} color="white" />
-        </div>
-        <div>
-          <h4 style={{ fontSize: '16px', color: '#064E3B', fontWeight: '800' }}>Compliance Verification Passed</h4>
-          <p style={{ fontSize: '14px', color: '#065F46' }}>System audit hashes are validated and immutable. Platform meets SOC2 and SEBI data integrity standards.</p>
         </div>
       </div>
     </div>

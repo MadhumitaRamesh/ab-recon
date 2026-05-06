@@ -88,6 +88,20 @@ export const AppProvider = ({ children }) => {
     { id: 'TXN-4126', amount: '4,200.00', ref: 'TR-112233', type: 'Reversal', age: '1h', priority: 'Medium', status: 'Unresolved' },
   ]));
 
+  // Audit Log Persistence
+  const [auditLogs, setAuditLogs] = useState(() => getSavedData('ab_recon_audit', [
+    { id: 1, user: 'Admin User', action: 'Update Permission', module: 'Access', detail: 'Changed BBPS role access matrix', time: '10:45 AM', date: '06 May 2026', type: 'Security' },
+    { id: 2, user: 'Ops Maker', action: 'Manual Run', module: 'Run Recon', detail: 'Triggered DigiGold Daily API', time: '09:30 AM', date: '06 May 2026', type: 'System' },
+    { id: 3, user: 'System', action: 'Cron Success', module: 'Scheduler', detail: 'Cash Back Daily batch successful', time: '12:00 AM', date: '06 May 2026', type: 'Auto' },
+  ]));
+
+  // Run History Persistence
+  const [runHistory, setRunHistory] = useState(() => getSavedData('ab_recon_history', [
+    { id: 'RUN-992', product: 'BBPS Daily', status: 'Completed', matched: '4,210', exceptions: '12', time: '14:20', date: '06 May 2026' },
+    { id: 'RUN-991', product: 'Cash Back', status: 'Failed', matched: '0', exceptions: '0', time: '13:05', date: '06 May 2026' },
+    { id: 'RUN-990', product: 'DigiGold API', status: 'Completed', matched: '1,105', exceptions: '4', time: '12:00', date: '05 May 2026' },
+  ]));
+
   // User Management Persistence
   const [users, setUsers] = useState(() => getSavedData('ab_recon_users', [
     { id: 1, name: 'Admin User', employeeId: 'ABC001', role: 'Admin', status: 'Active' },
@@ -119,6 +133,8 @@ export const AppProvider = ({ children }) => {
   useEffect(() => { localStorage.setItem('ab_recon_notifications', JSON.stringify(notifications)); }, [notifications]);
   useEffect(() => { localStorage.setItem('ab_recon_ai_suggestions', JSON.stringify(aiSuggestions)); }, [aiSuggestions]);
   useEffect(() => { localStorage.setItem('ab_recon_users', JSON.stringify(users)); }, [users]);
+  useEffect(() => { localStorage.setItem('ab_recon_audit', JSON.stringify(auditLogs)); }, [auditLogs]);
+  useEffect(() => { localStorage.setItem('ab_recon_history', JSON.stringify(runHistory)); }, [runHistory]);
 
   const login = (employeeId) => {
     const matchedUser = users.find(u => u.employeeId === employeeId);
@@ -158,6 +174,8 @@ export const AppProvider = ({ children }) => {
       exceptions, setExceptions,
       aiSuggestions, setAiSuggestions,
       users, setUsers,
+      auditLogs, setAuditLogs,
+      runHistory, setRunHistory,
       notifications, addNotification, markAllAsRead,
       searchQuery, setSearchQuery,
       sidebarOpen, setSidebarOpen,
