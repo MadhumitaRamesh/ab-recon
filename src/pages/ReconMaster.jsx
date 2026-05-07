@@ -8,15 +8,17 @@ const ReconMaster = () => {
   const [editingMaster, setEditingMaster] = useState(null);
   const [newMaster, setNewMaster] = useState({ name: '', frequency: 'Daily', type: 'Automatic', sources: '2-Way', status: 'Active' });
 
-  const handleAdd = (e) => {
+  const handleAdd = async (e) => {
     e.preventDefault();
     if (editingMaster) {
       const updatedMasters = masters.map(m => m.id === editingMaster.id ? { ...newMaster, id: m.id } : m);
       setMasters(updatedMasters);
       addNotification({ title: 'Master Updated', message: `Product ${newMaster.name} updated.` });
     } else {
-      addMaster(newMaster);
-      addNotification({ title: 'Master Created', message: `Product ${newMaster.name} created.` });
+      const success = await addMaster(newMaster);
+      if (success) {
+        addNotification({ title: 'Master Created', message: `Product ${newMaster.name} created.` });
+      }
     }
     setShowForm(false);
     setEditingMaster(null);

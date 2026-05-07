@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Shield, Plus, Edit3, Trash2, CheckCircle, X, Save, ShieldAlert } from 'lucide-react';
 
 const Roles = () => {
-  const { roles, setRoles, addNotification } = useApp();
+  const { roles, setRoles, addRole, addNotification } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
