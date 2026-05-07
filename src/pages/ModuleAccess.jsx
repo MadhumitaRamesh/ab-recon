@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { ShieldCheck, Save, RotateCcw, Lock, Unlock, CheckSquare, Square, AlertCircle } from 'lucide-react';
 
 const ModuleAccess = () => {
-  const { roles, modules, permissions, setPermissions, addNotification, getDefaultPermissions } = useApp();
+  const { roles, modules, permissions, saveAllPermissions, addNotification, getDefaultPermissions } = useApp();
   const [localPerms, setLocalPerms] = useState({...permissions});
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -19,21 +19,25 @@ const ModuleAccess = () => {
     setLocalPerms(updated);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (window.confirm('Are you sure you want to apply these permission changes across the entire platform? This will immediately affect all active users.')) {
-      setPermissions(localPerms);
-      addNotification({ title: 'Permissions Synced', message: 'The global module access matrix has been updated successfully.' });
-      alert('Success! Global module permissions have been updated and synchronized with the security matrix.');
+      const success = await saveAllPermissions(localPerms);
+      if (success) {
+        addNotification({ title: 'Permissions Synced', message: 'The global module access matrix has been updated successfully.' });
+        alert('Success! Global module permissions have been updated and synchronized with the security matrix.');
+      }
     }
   };
 
-  const handleReset = () => {
+  const handleReset = async () => {
     if (window.confirm('CRITICAL ACTION: Do you want to restore factory default permissions? This will override all current custom rules and cannot be undone.')) {
       const defaults = getDefaultPermissions();
-      setLocalPerms(defaults);
-      setPermissions(defaults); // Force save to context immediately for reset
-      addNotification({ title: 'Defaults Restored', message: 'System permissions have been reset to baseline defaults.' });
-      alert('System baseline permissions have been restored successfully.');
+      const success = await saveAllPermissions(defaults);
+      if (success) {
+        setLocalPerms(defaults);
+        addNotification({ title: 'Defaults Restored', message: 'System permissions have been reset to baseline defaults.' });
+        alert('System baseline permissions have been restored successfully.');
+      }
     }
   };
 

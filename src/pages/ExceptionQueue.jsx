@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Search, MoreHorizontal, Zap, Clock, X, ShieldAlert, Filter, Download } from 'lucide-react';
 
 const ExceptionQueue = () => {
-  const { exceptions, setExceptions, addNotification } = useApp();
+  const { exceptions, resolveException, addNotification } = useApp();
   const [selectedEx, setSelectedEx] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('All');
@@ -22,10 +22,12 @@ const ExceptionQueue = () => {
     return matchesSearch && matchesFilter;
   });
 
-  const handleAcceptMatch = (candidate) => {
-    setExceptions(exceptions.filter(ex => ex.id !== selectedEx.id));
-    addNotification({ title: 'Match Accepted', message: `TXN ${selectedEx.id} matched.` });
-    setSelectedEx(null);
+  const handleAcceptMatch = async (candidate) => {
+    const success = await resolveException(selectedEx.id);
+    if (success) {
+      addNotification({ title: 'Match Accepted', message: `TXN ${selectedEx.id} matched.` });
+      setSelectedEx(null);
+    }
   };
 
   return (

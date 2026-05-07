@@ -11,9 +11,10 @@ const ReconMaster = () => {
   const handleAdd = async (e) => {
     e.preventDefault();
     if (editingMaster) {
-      const updatedMasters = masters.map(m => m.id === editingMaster.id ? { ...newMaster, id: m.id } : m);
-      setMasters(updatedMasters);
-      addNotification({ title: 'Master Updated', message: `Product ${newMaster.name} updated.` });
+      const success = await updateMaster(editingMaster.id, newMaster);
+      if (success) {
+        addNotification({ title: 'Master Updated', message: `Product ${newMaster.name} updated.` });
+      }
     } else {
       const success = await addMaster(newMaster);
       if (success) {

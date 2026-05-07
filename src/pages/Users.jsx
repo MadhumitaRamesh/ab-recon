@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { UserPlus, Search, Edit3, Trash2, X, Hash, Shield, CheckCircle, Save } from 'lucide-react';
 
 const Users = () => {
-  const { users, setUsers, addUser, deleteUser, addNotification } = useApp();
+  const { users, setUsers, addUser, updateUser, deleteUser, addNotification } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,8 +36,10 @@ const Users = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (editingId) {
-      setUsers(users.map(u => u.id === editingId ? { ...formData, id: editingId } : u));
-      addNotification({ title: 'Profile Updated', message: `Identity ${formData.name} (${formData.employeeId}) has been modified.` });
+      const success = await updateUser(editingId, formData);
+      if (success) {
+        addNotification({ title: 'Profile Updated', message: `Identity ${formData.name} (${formData.employeeId}) has been modified.` });
+      }
     } else {
       const success = await addUser(formData);
       if (success) {

@@ -355,6 +355,27 @@ export const AppProvider = ({ children }) => {
     return false;
   };
 
+  const updateUser = async (id, updatedData) => {
+    try {
+      const res = await fetch(`${API_URL}/users/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: updatedData.name,
+          employee_id: updatedData.employeeId,
+          role_name: updatedData.role,
+          status: updatedData.status
+        })
+      });
+      if (res.ok) {
+        setUsers(prev => prev.map(u => u.id === id ? { ...updatedData, id } : u));
+        logAudit('User Updated', 'Identity', `Profile for ${updatedData.name} modified`, 'Security');
+        return true;
+      }
+    } catch (e) { console.error(e); }
+    return false;
+  };
+
   const deleteUser = async (id, name, employeeId) => {
     try {
       const res = await fetch(`${API_URL}/users/${id}`, { method: 'DELETE' });
@@ -365,6 +386,56 @@ export const AppProvider = ({ children }) => {
       }
     } catch (e) { console.error(e); }
     return false;
+  };
+
+  const updateMaster = async (id, updatedMaster) => {
+    try {
+      const res = await fetch(`${API_URL}/masters/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedMaster)
+      });
+      if (res.ok) {
+        setMasters(prev => prev.map(m => m.id === id ? { ...updatedMaster, id } : m));
+        logAudit('Master Updated', 'Recon', `Configuration for ${updatedMaster.name} modified`, 'System');
+        return true;
+      }
+    } catch (e) { console.error(e); }
+    return false;
+  };
+
+  const updateRole = async (id, updatedRole) => {
+    try {
+      const res = await fetch(`${API_URL}/roles/${id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedRole)
+      });
+      if (res.ok) {
+        setRoles(prev => prev.map(r => r.id === id ? { ...updatedRole, id } : r));
+        logAudit('Role Updated', 'RBAC', `Permissions for '${updatedRole.name}' modified`, 'Security');
+        return true;
+      }
+    } catch (e) { console.error(e); }
+    return false;
+  };
+
+  const savePermission = async (module_name, role_name, is_allowed) => {
+    try {
+      const res = await fetch(`${API_URL}/permissions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ module_name, role_name, is_allowed })
+      });
+      if (res.ok) {
+        setPermissions(prev => {
+          const newPerms = { ...prev };
+          if (!newPerms[module_name]) newPerms[module_name] = {};
+          newPerms[module_name][role_name] = is_allowed;
+          return newPerms;
+        });
+      }
+    } catch (e) { console.error(e); }
   };
 
   const addNotification = async (notif) => {
@@ -379,20 +450,59 @@ export const AppProvider = ({ children }) => {
     } catch (e) {}
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    try { await fetch(`${API_URL}/notifications/read`, { method: 'PATCH' }); } catch (e) {}
+  };
+
+  const saveAllPermissions = async (perms) => {
+    try {
+      const promises = [];
+      Object.keys(perms).forEach(modName => {
+        Object.keys(perms[modName]).forEach(roleName => {
+          promises.push(
+            fetch(`${API_URL}/permissions`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                module_name: modName,
+                role_name: roleName,
+                is_allowed: perms[modName][roleName] ? 1 : 0
+              })
+            })
+          );
+        });
+      });
+      await Promise.all(promises);
+      setPermissions(perms);
+      logAudit('Permissions Updated', 'RBAC', 'Global module access matrix modified', 'Security');
+      return true;
+    } catch (e) { console.error(e); }
+    return false;
+  };
+
+  const resolveException = async (id) => {
+    try {
+      const res = await fetch(`${API_URL}/exceptions/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setExceptions(prev => prev.filter(e => e.id !== id));
+        logAudit('Exception Resolved', 'Exception', `Transaction ${id} marked as closed`, 'Operations');
+        return true;
+      }
+    } catch (e) { console.error(e); }
+    return false;
   };
 
   return (
     <AppContext.Provider value={{
       user, setUser,
       activePage, setActivePage,
-      roles, setRoles, addRole, deleteRole,
-      permissions, setPermissions,
-      masters, setMasters, addMaster, deleteMaster,
-      exceptions, setExceptions,
+      roles, setRoles, addRole, updateRole, deleteRole,
+      permissions, setPermissions, savePermission, saveAllPermissions,
+      masters, setMasters, addMaster, updateMaster, deleteMaster,
+      exceptions, setExceptions, resolveException,
       aiSuggestions, setAiSuggestions,
-      users, setUsers, addUser, deleteUser,
+      users, setUsers, addUser, updateUser, deleteUser,
       auditLogs, setAuditLogs, logAudit,
       runHistory, setRunHistory: saveRunHistory,
       notifications, addNotification, markAllAsRead,

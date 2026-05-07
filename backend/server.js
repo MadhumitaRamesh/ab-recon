@@ -81,6 +81,18 @@ app.post('/api/roles', (req, res) => {
     );
 });
 
+app.put('/api/roles/:id', (req, res) => {
+    const { name, description, level } = req.body;
+    db.query(
+        'UPDATE roles SET name = ?, description = ?, level = ? WHERE id = ?',
+        [name, description, level, req.params.id],
+        (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        }
+    );
+});
+
 app.delete('/api/roles/:id', (req, res) => {
     db.query('DELETE FROM roles WHERE id = ?', [req.params.id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -94,6 +106,18 @@ app.get('/api/permissions', (req, res) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
+});
+
+app.post('/api/permissions', (req, res) => {
+    const { module_name, role_name, is_allowed } = req.body;
+    db.query(
+        'INSERT INTO permissions (module_name, role_name, is_allowed) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE is_allowed = ?',
+        [module_name, role_name, is_allowed, is_allowed],
+        (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        }
+    );
 });
 
 // --- MASTERS ---
@@ -113,6 +137,18 @@ app.post('/api/masters', (req, res) => {
     });
 });
 
+app.put('/api/masters/:id', (req, res) => {
+    const { name, frequency, type, sources, status } = req.body;
+    db.query(
+        'UPDATE masters SET name = ?, frequency = ?, type = ?, sources = ?, status = ? WHERE id = ?',
+        [name, frequency, type, sources, status, req.params.id],
+        (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        }
+    );
+});
+
 app.delete('/api/masters/:id', (req, res) => {
     db.query('DELETE FROM masters WHERE id = ?', [req.params.id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -125,6 +161,25 @@ app.get('/api/exceptions', (req, res) => {
     db.query('SELECT * FROM exceptions', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
+    });
+});
+
+app.post('/api/exceptions', (req, res) => {
+    const { amount, ref_no, type, age, priority, status } = req.body;
+    db.query(
+        'INSERT INTO exceptions (amount, ref_no, type, age, priority, status) VALUES (?, ?, ?, ?, ?, ?)',
+        [amount, ref_no, type, age, priority, status],
+        (err, results) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ id: results.insertId, ...req.body });
+        }
+    );
+});
+
+app.delete('/api/exceptions/:id', (req, res) => {
+    db.query('DELETE FROM exceptions WHERE id = ?', [req.params.id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
     });
 });
 
@@ -193,6 +248,18 @@ app.post('/api/users', async (req, res) => {
     }
 });
 
+app.put('/api/users/:id', (req, res) => {
+    const { name, employee_id, role_name, status } = req.body;
+    db.query(
+        'UPDATE users SET name = ?, employee_id = ?, role_name = ?, status = ? WHERE id = ?',
+        [name, employee_id, role_name, status, req.params.id],
+        (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        }
+    );
+});
+
 app.delete('/api/users/:id', (req, res) => {
     db.query('DELETE FROM users WHERE id = ?', [req.params.id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
@@ -214,6 +281,13 @@ app.post('/api/notifications', (req, res) => {
     [title, message, time_label], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ id: results.insertId, ...req.body });
+    });
+});
+
+app.patch('/api/notifications/read', (req, res) => {
+    db.query('UPDATE notifications SET is_read = 1', (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
     });
 });
 

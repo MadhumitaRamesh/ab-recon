@@ -28,8 +28,10 @@ const Roles = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (editingId) {
-      setRoles(roles.map(r => r.id === editingId ? { ...r, ...formData } : r));
-      addNotification({ title: 'Role Updated', message: `The '${formData.name}' role definition has been modified.` });
+      const success = await updateRole(editingId, formData);
+      if (success) {
+        addNotification({ title: 'Role Updated', message: `The '${formData.name}' role definition has been modified.` });
+      }
     } else {
       const success = await addRole(formData);
       if (success) {
