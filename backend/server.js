@@ -67,6 +67,20 @@ app.get('/api/roles', (req, res) => {
     });
 });
 
+app.post('/api/roles', (req, res) => {
+    const { name, description, level } = req.body;
+    if (!name) return res.status(400).json({ error: 'Role name is required.' });
+
+    db.query(
+        'INSERT INTO roles (name, description, level) VALUES (?, ?, ?)',
+        [name, description || '', level || 'Operational'],
+        (err, results) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, id: results.insertId, name, description, level });
+        }
+    );
+});
+
 // --- PERMISSIONS ---
 app.get('/api/permissions', (req, res) => {
     db.query('SELECT * FROM permissions', (err, results) => {

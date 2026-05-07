@@ -25,15 +25,16 @@ const Roles = () => {
     setShowForm(true);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (editingId) {
       setRoles(roles.map(r => r.id === editingId ? { ...r, ...formData } : r));
       addNotification({ title: 'Role Updated', message: `The '${formData.name}' role definition has been modified.` });
     } else {
-      const id = Date.now();
-      setRoles([...roles, { ...formData, id }]);
-      addNotification({ title: 'Role Created', message: `New role '${formData.name}' successfully added to the RBAC matrix.` });
+      const success = await addRole(formData);
+      if (success) {
+        addNotification({ title: 'Role Created', message: `New role '${formData.name}' successfully added to the RBAC matrix.` });
+      }
     }
     setShowForm(false);
   };

@@ -275,6 +275,25 @@ export const AppProvider = ({ children }) => {
     setTimeout(() => { window.location.reload(); }, 50);
   };
 
+  const addRole = async (roleData) => {
+    try {
+      const res = await fetch(`${API_URL}/roles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(roleData)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setRoles(prev => [...prev, { ...roleData, id: data.id }]);
+        logAudit('Role Created', 'RBAC', `New role '${roleData.name}' defined`, 'Security');
+        return true;
+      }
+    } catch (err) {
+      console.error('Role Persistence Failed:', err);
+    }
+    return false;
+  };
+
   const addMaster = async (master) => {
     try {
       const res = await fetch(`${API_URL}/masters`, {
@@ -283,10 +302,16 @@ export const AppProvider = ({ children }) => {
         body: JSON.stringify({ ...master, status: 'Active' })
       });
       const saved = await res.json();
-      setMasters(prev => [...prev, saved]);
+      if (res.ok) {
+        setMasters(prev => [...prev, saved]);
+        logAudit('Master Record Created', 'Recon', `Product ${master.name} added to master list`, 'System');
+        return true;
+      }
     } catch (e) {
+      console.error('Master Persistence Failed:', e);
       setMasters(prev => [...prev, { ...master, id: Date.now() }]);
     }
+    return false;
   };
 
   const saveRunHistory = async (newRun) => {
@@ -326,7 +351,7 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider value={{
       user, setUser,
       activePage, setActivePage,
-      roles, setRoles,
+      roles, setRoles, addRole,
       permissions, setPermissions,
       masters, setMasters, addMaster,
       exceptions, setExceptions,
