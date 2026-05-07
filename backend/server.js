@@ -239,7 +239,12 @@ app.post('/api/users', async (req, res) => {
             'INSERT INTO users (name, employee_id, role_name, status, password_hash) VALUES (?, ?, ?, ?, ?)',
             [name, employeeId, role, status || 'Active', hash],
             (err, results) => {
-                if (err) return res.status(500).json({ error: err.message });
+                if (err) {
+                    if (err.code === 'ER_DUP_ENTRY') {
+                        return res.status(409).json({ error: `Employee ID ${employeeId} already exists in the system.` });
+                    }
+                    return res.status(500).json({ error: err.message });
+                }
                 res.json({ success: true, id: results.insertId });
             }
         );

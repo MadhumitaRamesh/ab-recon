@@ -41,9 +41,13 @@ const Users = () => {
         addNotification({ title: 'Profile Updated', message: `Identity ${formData.name} (${formData.employeeId}) has been modified.` });
       }
     } else {
-      const success = await addUser(formData);
-      if (success) {
+      const result = await addUser(formData);
+      if (result.success) {
         addNotification({ title: 'User Created', message: `Identity ${formData.name} has been added to the platform.` });
+        setShowForm(false);
+      } else {
+        alert(`Provisioning Error: ${result.error}`);
+        return; // Keep form open on error
       }
     }
     setShowForm(false);

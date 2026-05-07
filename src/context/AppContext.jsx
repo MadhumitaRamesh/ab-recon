@@ -222,23 +222,25 @@ export const AppProvider = ({ children }) => {
     } catch (e) {}
   };
 
-  const addUser = async (newUser) => {
+  const addUser = async (userData) => {
     try {
       const res = await fetch(`${API_URL}/users`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newUser)
+        body: JSON.stringify(userData)
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setUsers(prev => [...prev, { ...newUser, id: data.id }]);
-        logAudit('User Provisioned', 'Identity', `Created access for ${newUser.name} (${newUser.employeeId})`, 'Security');
-        return true;
+        setUsers(prev => [...prev, { ...userData, id: data.id }]);
+        logAudit('User Provisioned', 'Identity', `New employee access granted to ${userData.name}`, 'Security');
+        return { success: true };
+      } else {
+        return { success: false, error: data.error || 'Identity provisioning failed.' };
       }
     } catch (err) {
-      console.error('User Persistence Failed:', err);
+      console.error('User Provisioning Failed:', err);
+      return { success: false, error: 'Network error or server unavailable.' };
     }
-    return false;
   };
 
   const login = async (employeeId, password) => {
