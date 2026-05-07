@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Plus, Database, Settings2, FileCode, Edit3, Trash2, X } from 'lucide-react';
 
 const ReconMaster = () => {
-  const { masters, setMasters, addMaster, addNotification } = useApp();
+  const { masters, setMasters, addMaster, deleteMaster, addNotification } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingMaster, setEditingMaster] = useState(null);
   const [newMaster, setNewMaster] = useState({ name: '', frequency: 'Daily', type: 'Automatic', sources: '2-Way', status: 'Active' });
@@ -32,10 +32,12 @@ const ReconMaster = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleDelete = (id, name) => {
+  const handleDelete = async (id, name) => {
     if (window.confirm(`Delete ${name}?`)) {
-      setMasters(masters.filter(m => m.id !== id));
-      addNotification({ title: 'Master Deleted', message: `Product ${name} removed.` });
+      const success = await deleteMaster(id, name);
+      if (success) {
+        addNotification({ title: 'Master Deleted', message: `Product ${name} removed.` });
+      }
     }
   };
 

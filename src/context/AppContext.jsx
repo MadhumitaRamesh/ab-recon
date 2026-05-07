@@ -331,6 +331,42 @@ export const AppProvider = ({ children }) => {
     } catch (e) {}
   };
 
+  const deleteRole = async (id, name) => {
+    try {
+      const res = await fetch(`${API_URL}/roles/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setRoles(prev => prev.filter(r => r.id !== id));
+        logAudit('Role Deleted', 'RBAC', `Role '${name}' permanently removed`, 'Security');
+        return true;
+      }
+    } catch (e) { console.error(e); }
+    return false;
+  };
+
+  const deleteMaster = async (id, name) => {
+    try {
+      const res = await fetch(`${API_URL}/masters/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setMasters(prev => prev.filter(m => m.id !== id));
+        logAudit('Master Deleted', 'Recon', `Product ${name} removed`, 'System');
+        return true;
+      }
+    } catch (e) { console.error(e); }
+    return false;
+  };
+
+  const deleteUser = async (id, name, employeeId) => {
+    try {
+      const res = await fetch(`${API_URL}/users/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        setUsers(prev => prev.filter(u => u.id !== id));
+        logAudit('Access Revoked', 'Identity', `User ${name} (${employeeId}) removed`, 'Security');
+        return true;
+      }
+    } catch (e) { console.error(e); }
+    return false;
+  };
+
   const addNotification = async (notif) => {
     const newNotif = { ...notif, id: Date.now(), time: 'Just now', read: false };
     setNotifications(prev => [newNotif, ...prev]);
@@ -351,12 +387,12 @@ export const AppProvider = ({ children }) => {
     <AppContext.Provider value={{
       user, setUser,
       activePage, setActivePage,
-      roles, setRoles, addRole,
+      roles, setRoles, addRole, deleteRole,
       permissions, setPermissions,
-      masters, setMasters, addMaster,
+      masters, setMasters, addMaster, deleteMaster,
       exceptions, setExceptions,
       aiSuggestions, setAiSuggestions,
-      users, setUsers, addUser,
+      users, setUsers, addUser, deleteUser,
       auditLogs, setAuditLogs, logAudit,
       runHistory, setRunHistory: saveRunHistory,
       notifications, addNotification, markAllAsRead,

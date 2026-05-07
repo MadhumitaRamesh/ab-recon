@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { UserPlus, Search, Edit3, Trash2, X, Hash, Shield, CheckCircle, Save } from 'lucide-react';
 
 const Users = () => {
-  const { users, setUsers, addUser, addNotification } = useApp();
+  const { users, setUsers, addUser, deleteUser, addNotification } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -47,10 +47,12 @@ const Users = () => {
     setShowForm(false);
   };
 
-  const handleDelete = (id, name) => {
+  const handleDelete = async (id, name, employeeId) => {
     if (window.confirm(`Are you sure you want to revoke access for ${name}?`)) {
-      setUsers(users.filter(u => u.id !== id));
-      addNotification({ title: 'Access Revoked', message: `User ${name} removed from system.` });
+      const success = await deleteUser(id, name, employeeId);
+      if (success) {
+        addNotification({ title: 'Access Revoked', message: `User ${name} removed from system.` });
+      }
     }
   };
 
@@ -177,7 +179,7 @@ const Users = () => {
                       <button onClick={() => handleOpenEdit(u)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#64748B' }}>
                         <Edit3 size={18} />
                       </button>
-                      <button onClick={() => handleDelete(u.id, u.name)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#DC2626' }}>
+                      <button onClick={() => handleDelete(u.id, u.name, u.employeeId)} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: '#DC2626' }}>
                         <Trash2 size={18} />
                       </button>
                     </div>

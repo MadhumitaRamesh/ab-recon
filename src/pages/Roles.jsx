@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Shield, Plus, Edit3, Trash2, CheckCircle, X, Save, ShieldAlert } from 'lucide-react';
 
 const Roles = () => {
-  const { roles, setRoles, addRole, addNotification } = useApp();
+  const { roles, setRoles, addRole, deleteRole, addNotification } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -39,14 +39,16 @@ const Roles = () => {
     setShowForm(false);
   };
 
-  const handleDelete = (id, name) => {
+  const handleDelete = async (id, name) => {
     if (name === 'Admin') {
       alert('The Admin role is a system requirement and cannot be deleted.');
       return;
     }
     if (window.confirm(`Are you sure you want to delete the '${name}' role? This may affect user access.`)) {
-      setRoles(roles.filter(r => r.id !== id));
-      addNotification({ title: 'Role Deleted', message: `The '${name}' role has been permanently removed.` });
+      const success = await deleteRole(id, name);
+      if (success) {
+        addNotification({ title: 'Role Deleted', message: `The '${name}' role has been permanently removed.` });
+      }
     }
   };
 

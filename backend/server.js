@@ -81,6 +81,13 @@ app.post('/api/roles', (req, res) => {
     );
 });
 
+app.delete('/api/roles/:id', (req, res) => {
+    db.query('DELETE FROM roles WHERE id = ?', [req.params.id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
+});
+
 // --- PERMISSIONS ---
 app.get('/api/permissions', (req, res) => {
     db.query('SELECT * FROM permissions', (err, results) => {
@@ -103,6 +110,13 @@ app.post('/api/masters', (req, res) => {
     [name, frequency, type, sources, status], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ id: results.insertId, ...req.body });
+    });
+});
+
+app.delete('/api/masters/:id', (req, res) => {
+    db.query('DELETE FROM masters WHERE id = ?', [req.params.id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
     });
 });
 
@@ -177,6 +191,13 @@ app.post('/api/users', async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: 'Encryption failed.' });
     }
+});
+
+app.delete('/api/users/:id', (req, res) => {
+    db.query('DELETE FROM users WHERE id = ?', [req.params.id], (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
 });
 
 // --- NOTIFICATIONS ---
