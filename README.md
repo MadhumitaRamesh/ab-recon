@@ -1,4 +1,4 @@
-# Reconciliation Platform (ABc Recon)
+# Reconciliation Platform (ABC Recon)
 
 The Reconciliation Platform is an enterprise-grade solution designed to automate and secure data reconciliation processes. It provides a robust framework for managing financial data integrity, user identities, and system-wide auditability.
 
