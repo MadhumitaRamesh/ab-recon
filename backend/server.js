@@ -138,12 +138,31 @@ app.post('/api/run-history', (req, res) => {
     });
 });
 
-// --- USERS (never expose password_hash) ---
+// --- USERS ---
 app.get('/api/users', (req, res) => {
     db.query('SELECT id, name, employee_id, role_name, status FROM users', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
+});
+
+app.post('/api/users', async (req, res) => {
+    const { name, employeeId, role, status, password } = req.body;
+    if (!name || !employeeId || !role || !password) return res.status(400).json({ error: 'Missing required fields.' });
+
+    try {
+        const hash = await bcrypt.hash(password, 10);
+        db.query(
+            'INSERT INTO users (name, employee_id, role_name, status, password_hash) VALUES (?, ?, ?, ?, ?)',
+            [name, employeeId, role, status || 'Active', hash],
+            (err, results) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ success: true, id: results.insertId });
+            }
+        );
+    } catch (err) {
+        res.status(500).json({ error: 'Encryption failed.' });
+    }
 });
 
 // --- NOTIFICATIONS ---

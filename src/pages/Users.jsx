@@ -3,12 +3,12 @@ import { useApp } from '../context/AppContext';
 import { UserPlus, Search, Edit3, Trash2, X, Hash, Shield, CheckCircle, Save } from 'lucide-react';
 
 const Users = () => {
-  const { users, setUsers, addNotification } = useApp();
+  const { users, setUsers, addUser, addNotification } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('All');
-  const [formData, setFormData] = useState({ name: '', employeeId: '', role: 'Ops_Maker', status: 'Active' });
+  const [formData, setFormData] = useState({ name: '', employeeId: '', role: 'Ops_Maker', status: 'Active', password: '' });
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -23,25 +23,26 @@ const Users = () => {
 
   const handleOpenAdd = () => {
     setEditingId(null);
-    setFormData({ name: '', employeeId: '', role: 'Ops_Maker', status: 'Active' });
+    setFormData({ name: '', employeeId: '', role: 'Ops_Maker', status: 'Active', password: '' });
     setShowForm(true);
   };
 
   const handleOpenEdit = (user) => {
     setEditingId(user.id);
-    setFormData({ name: user.name, employeeId: user.employeeId, role: user.role, status: user.status });
+    setFormData({ name: user.name, employeeId: user.employeeId, role: user.role, status: user.status, password: '' });
     setShowForm(true);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (editingId) {
       setUsers(users.map(u => u.id === editingId ? { ...formData, id: editingId } : u));
       addNotification({ title: 'Profile Updated', message: `Identity ${formData.name} (${formData.employeeId}) has been modified.` });
     } else {
-      const id = Date.now();
-      setUsers([...users, { ...formData, id }]);
-      addNotification({ title: 'User Created', message: `Identity ${formData.name} has been added to the platform.` });
+      const success = await addUser(formData);
+      if (success) {
+        addNotification({ title: 'User Created', message: `Identity ${formData.name} has been added to the platform.` });
+      }
     }
     setShowForm(false);
   };
@@ -116,6 +117,12 @@ const Users = () => {
                   <option value="CS User">CS User</option>
                 </select>
               </div>
+              {!editingId && (
+                <div className="form-group">
+                  <label className="form-label">Initial Access Password</label>
+                  <input type="password" placeholder="••••••••" className="form-control" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} required />
+                </div>
+              )}
               <div style={{ display: 'flex', gap: '16px', marginTop: '32px' }}>
                 <button type="submit" className="btn btn-primary" style={{ flex: 1 }}>
                   {editingId ? <><Save size={18} style={{ marginRight: '8px' }} /> Save Changes</> : 'Confirm Provisioning'}

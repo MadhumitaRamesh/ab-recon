@@ -222,6 +222,25 @@ export const AppProvider = ({ children }) => {
     } catch (e) {}
   };
 
+  const addUser = async (newUser) => {
+    try {
+      const res = await fetch(`${API_URL}/users`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newUser)
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setUsers(prev => [...prev, { ...newUser, id: data.id }]);
+        logAudit('User Provisioned', 'Identity', `Created access for ${newUser.name} (${newUser.employeeId})`, 'Security');
+        return true;
+      }
+    } catch (err) {
+      console.error('User Persistence Failed:', err);
+    }
+    return false;
+  };
+
   const login = async (employeeId, password) => {
     try {
       const res = await fetch(`${API_URL}/login`, {
@@ -312,7 +331,7 @@ export const AppProvider = ({ children }) => {
       masters, setMasters, addMaster,
       exceptions, setExceptions,
       aiSuggestions, setAiSuggestions,
-      users, setUsers,
+      users, setUsers, addUser,
       auditLogs, setAuditLogs, logAudit,
       runHistory, setRunHistory: saveRunHistory,
       notifications, addNotification, markAllAsRead,
