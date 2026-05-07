@@ -143,7 +143,7 @@ const Dashboard = () => {
           </div>
           
           <div style={{ marginTop: '40px', paddingTop: '32px', borderTop: '1px solid var(--border-light)', textAlign: 'center' }}>
-            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '24px', lineHeight: '1.5' }}>All systems are currently being monitored by the AB Recon Intelligence Core.</p>
+            <p style={{ fontSize: '13px', color: '#64748B', marginBottom: '24px', lineHeight: '1.5' }}>All systems are currently being monitored by the ABC Recon Intelligence Core.</p>
             <button className="btn btn-outline" style={{ width: '100%', height: '52px' }} onClick={() => setActivePage('audit')}>View System Logs</button>
           </div>
         </div>

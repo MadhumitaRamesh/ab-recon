@@ -58,7 +58,7 @@ const Login = ({ onLogin }) => {
           }}>
             <ShieldCheck size={40} color="white" />
           </div>
-          <h1 style={{ fontSize: '28px', color: '#1E293B', fontWeight: '800' }}>AB Recon Platform</h1>
+          <h1 style={{ fontSize: '28px', color: '#1E293B', fontWeight: '800' }}>ABC Recon Platform</h1>
           <p style={{ color: '#64748B', fontSize: '15px', marginTop: '8px' }}>Secure Identity Management Gateway</p>
         </div>
 

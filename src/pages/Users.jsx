@@ -63,7 +63,7 @@ const Users = () => {
       <div style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px' }}>
         <div style={{ flex: '1', minWidth: '300px' }}>
           <h1 style={{ fontSize: 'clamp(24px, 5vw, 32px)', color: '#0F172A', fontWeight: '800' }}>Identity Management</h1>
-          <p style={{ color: '#64748B', fontSize: '16px', marginTop: '6px' }}>Manage and provision employee access for the AB Recon platform.</p>
+          <p style={{ color: '#64748B', fontSize: '16px', marginTop: '6px' }}>Manage and provision employee access for the ABC Recon platform.</p>
         </div>
         <button className="btn btn-primary" onClick={handleOpenAdd} style={{ height: '52px', minWidth: '220px' }}>
           <UserPlus size={18} style={{ marginRight: '10px' }} /> Provision New User
