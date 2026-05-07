@@ -1,6 +1,6 @@
-# Aditya Birla Reconciliation Platform (AB Recon)
+# Reconciliation Platform (ABc Recon)
 
-The Aditya Birla Reconciliation Platform is an enterprise-grade solution designed to automate and secure data reconciliation processes. It provides a robust framework for managing financial data integrity, user identities, and system-wide auditability.
+The Reconciliation Platform is an enterprise-grade solution designed to automate and secure data reconciliation processes. It provides a robust framework for managing financial data integrity, user identities, and system-wide auditability.
 
 ## Core Modules
 
