@@ -10,22 +10,31 @@ app.use(express.json());
 
 const db = require('./db');
 const { initScheduler } = require('./scheduler');
+const jwt = require('jsonwebtoken');
+
+const JWT_SECRET = process.env.JWT_SECRET || 'abc-recon-secret-key-2026';
 
 // --- MIDDLEWARE: RBAC ---
 const checkRole = (allowedRoles) => {
     return (req, res, next) => {
-        // Simulation: Reading role from header 'x-user-role'
-        // In a production app, this would come from a verified JWT or Session
-        const userRole = req.headers['x-user-role'];
-        
-        if (!userRole) {
-            return res.status(401).json({ error: 'Authentication required.' });
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+
+        if (!token) {
+            return res.status(401).json({ error: 'Access denied. No token provided.' });
         }
 
-        if (!allowedRoles.includes(userRole)) {
-            return res.status(403).json({ error: 'You do not have permission to trigger reconciliation runs.' });
+        try {
+            const decoded = jwt.verify(token, JWT_SECRET);
+            req.user = decoded;
+            
+            if (!allowedRoles.includes(decoded.role)) {
+                return res.status(403).json({ error: 'You do not have permission to trigger reconciliation runs.' });
+            }
+            next();
+        } catch (err) {
+            res.status(401).json({ error: 'Invalid or expired token.' });
         }
-        next();
     };
 };
 
@@ -62,11 +71,16 @@ app.post('/api/login', (req, res) => {
         const match = await bcrypt.compare(password, user.password_hash);
         if (!match) return res.status(401).json({ error: 'Incorrect password.' });
 
-        res.json({ success: true, user: {
-            id: user.id, name: user.name,
+        const userData = {
+            id: user.id,
+            name: user.name,
             employeeId: user.employee_id,
-            role: user.role_name, status: user.status
-        }});
+            role: user.role_name
+        };
+
+        const token = jwt.sign(userData, JWT_SECRET, { expiresIn: '8h' });
+
+        res.json({ success: true, token, user: userData });
     });
 });
 
