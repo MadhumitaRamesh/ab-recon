@@ -211,15 +211,24 @@ app.delete('/api/masters/:id', (req, res) => {
 
 // --- EXCEPTIONS ---
 app.get('/api/exceptions', (req, res) => {
-    const sql = `
-        SELECT 
-            e.*, 
-            m.name as product_name 
-        FROM exceptions e 
-        LEFT JOIN masters m ON e.recon_master_id = m.id 
-        ORDER BY e.run_date DESC, e.id DESC
+    const { date, master, type, priority, status } = req.query;
+    let sql = `
+        SELECT e.*, m.name as product_name 
+        FROM exceptions e
+        JOIN masters m ON e.recon_master_id = m.id
+        WHERE 1=1
     `;
-    db.query(sql, (err, results) => {
+    const params = [];
+
+    if (date) { sql += ' AND e.run_date = ?'; params.push(date); }
+    if (master && master !== 'All Products') { sql += ' AND m.name = ?'; params.push(master); }
+    if (type && type !== 'All Types') { sql += ' AND e.type = ?'; params.push(type); }
+    if (priority && priority !== 'All Priorities') { sql += ' AND e.priority = ?'; params.push(priority); }
+    if (status && status !== 'All Statuses') { sql += ' AND e.status = ?'; params.push(status); }
+
+    sql += ' ORDER BY e.run_date DESC, e.id DESC';
+
+    db.query(sql, params, (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
@@ -302,7 +311,18 @@ app.post('/api/audit-logs', (req, res) => {
 
 // --- RUN HISTORY ---
 app.get('/api/run-history', (req, res) => {
-    db.query('SELECT * FROM run_history ORDER BY run_date DESC, run_time DESC', (err, results) => {
+    const { date, master, status, triggerType } = req.query;
+    let sql = 'SELECT * FROM run_history WHERE 1=1';
+    const params = [];
+
+    if (date) { sql += ' AND run_date = ?'; params.push(date); }
+    if (master && master !== 'All Products') { sql += ' AND product = ?'; params.push(master); }
+    if (status && status !== 'All Statuses') { sql += ' AND status = ?'; params.push(status); }
+    if (triggerType && triggerType !== 'All Types') { sql += ' AND trigger_type = ?'; params.push(triggerType); }
+
+    sql += ' ORDER BY run_date DESC, run_time DESC';
+
+    db.query(sql, params, (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
@@ -321,31 +341,22 @@ app.post('/api/run-history', checkRole(['Admin', 'Ops_Maker']), (req, res) => {
 });
 
 app.post('/api/recon/trigger', checkRole(['Admin', 'Ops_Maker']), async (req, res) => {
-    const { masterId, runDate, triggerType } = req.body;
+    const { masterId, runDate, triggerType, manualData } = req.body;
     
     try {
-        // Fetch Master Config
         db.query('SELECT * FROM masters WHERE id = ?', [masterId], async (err, masters) => {
-            if (err || masters.length === 0) return res.status(404).json({ error: 'Master not found' });
+            if (err || masters.length === 0) return res.status(404).json({ error: 'Recon Master not found' });
             
             const master = masters[0];
-            // Mock source data for matching
-            const mockSourceData = {
-                s1: [
-                    { amount: 1200.50, reference_number: 'TXN-9920', unique_reference_number: 'URN-A-1' },
-                    { amount: 550.00, reference_number: 'TXN-9921', unique_reference_number: 'URN-A-2' }
-                ],
-                s2: [
-                    { amount: 1200.50, reference_number: 'TXN-9920', unique_reference_number: 'URN-A-1' }
-                    // 550.00 is missing, will create exception
-                ]
-            };
-
-            const result = await runReconciliation(master, mockSourceData, runDate, triggerType || 'Manual');
-            res.json(result);
+            try {
+                const result = await runReconciliation(master, runDate, triggerType || 'Manual', manualData || {});
+                res.json(result);
+            } catch (reconErr) {
+                res.status(400).json({ error: reconErr.message });
+            }
         });
     } catch (err) {
-        res.status(500).json({ error: err.message });
+        res.status(500).json({ error: `System Error: ${err.message}` });
     }
 });
 

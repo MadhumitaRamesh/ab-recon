@@ -23,7 +23,7 @@ const RunRecon = () => {
     addNotification, 
     logAudit, 
     runHistory, 
-    setRunHistory, 
+    fetchFilteredHistory,
     masters, 
     user, 
     triggerReconRun, 
@@ -41,8 +41,19 @@ const RunRecon = () => {
   const finishTriggered = useRef(false);
 
   // Filter states for history
-  const [filterText, setFilterText] = useState('');
-  const [statusFilter, setStatusFilter] = useState('All');
+  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [filterProduct, setFilterProduct] = useState('All Products');
+  const [filterStatus, setFilterStatus] = useState('All Statuses');
+  const [filterTrigger, setFilterTrigger] = useState('All Types');
+
+  useEffect(() => {
+    fetchFilteredHistory({
+        date: filterDate,
+        master: filterProduct,
+        status: filterStatus,
+        triggerType: filterTrigger
+    });
+  }, [filterDate, filterProduct, filterStatus, filterTrigger]);
 
   const selectedMaster = (masters || []).find(m => String(m.id) === String(selectedMasterId));
 
@@ -127,16 +138,7 @@ const RunRecon = () => {
     // In a real app, we'd also filter the audit log
   };
 
-  const filteredHistory = (runHistory || []).filter(r => {
-    if (!r || !r.product) return false;
-    const prodName = String(r.product).toLowerCase();
-    const runId = String(r.id).toLowerCase();
-    const search = filterText.toLowerCase();
-    
-    const matchesSearch = prodName.includes(search) || runId.includes(search);
-    const matchesStatus = statusFilter === 'All' || r.status === statusFilter;
-    return matchesSearch && matchesStatus;
-  });
+  const filteredHistory = runHistory || [];
 
   const handleFileChange = (sourceId, fileName) => {
     setFileSelections(prev => ({ ...prev, [sourceId]: fileName }));
@@ -305,35 +307,78 @@ const RunRecon = () => {
 
       {/* HISTORY TABLE */}
       <div className="card" style={{ padding: '0', overflow: 'hidden', background: 'white' }}>
-        <div style={{ padding: '24px 32px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+        <div style={{ padding: '24px 32px', borderBottom: '1px solid #F1F5F9' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
             <div style={{ padding: '8px', background: '#F0F9FF', borderRadius: '8px' }}>
               <History size={18} color="#0284C7" />
             </div>
             <h3 style={{ fontSize: '16px', fontWeight: '800' }}>Execution Audit Logs</h3>
           </div>
-          <div style={{ display: 'flex', gap: '12px', flex: '1', justifyContent: 'flex-end', minWidth: '300px' }}>
-            <div style={{ position: 'relative', maxWidth: '300px', width: '100%' }}>
-              <Search size={14} style={{ position: 'absolute', left: '12px', top: '14px', color: '#94A3B8' }} />
+
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
+            <div style={{ flex: '1', minWidth: '150px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#64748B', marginBottom: '6px', textTransform: 'uppercase' }}>Run Date</label>
               <input 
-                type="text" 
-                placeholder="Filter logs..." 
+                type="date" 
                 className="form-control" 
-                value={filterText}
-                onChange={(e) => setFilterText(e.target.value)}
-                style={{ height: '40px', paddingLeft: '36px', fontSize: '13px' }} 
+                value={filterDate} 
+                onChange={(e) => setFilterDate(e.target.value)}
+                style={{ height: '40px', fontSize: '13px' }} 
               />
             </div>
-            <select 
-              className="form-control" 
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{ height: '40px', width: '130px', fontSize: '13px' }}
-            >
-              <option value="All">All Results</option>
-              <option value="Completed">Success</option>
-              <option value="Failed">Failed</option>
-            </select>
+            <div style={{ flex: '1.5', minWidth: '200px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#64748B', marginBottom: '6px', textTransform: 'uppercase' }}>Recon Product</label>
+              <select 
+                className="form-control" 
+                value={filterProduct}
+                onChange={(e) => setFilterProduct(e.target.value)}
+                style={{ height: '40px', fontSize: '13px' }}
+              >
+                <option value="All Products">All Products</option>
+                {masters.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+              </select>
+            </div>
+            <div style={{ flex: '1', minWidth: '130px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#64748B', marginBottom: '6px', textTransform: 'uppercase' }}>Status</label>
+              <select 
+                className="form-control" 
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                style={{ height: '40px', fontSize: '13px' }}
+              >
+                <option value="All Statuses">All Statuses</option>
+                <option value="Completed">Completed</option>
+                <option value="Failed">Failed</option>
+              </select>
+            </div>
+            <div style={{ flex: '1', minWidth: '130px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#64748B', marginBottom: '6px', textTransform: 'uppercase' }}>Trigger Type</label>
+              <select 
+                className="form-control" 
+                value={filterTrigger}
+                onChange={(e) => setFilterTrigger(e.target.value)}
+                style={{ height: '40px', fontSize: '13px' }}
+              >
+                <option value="All Types">All Types</option>
+                <option value="Manual">Manual</option>
+                <option value="Cron">Cron</option>
+                <option value="API">API</option>
+              </select>
+            </div>
+            <div style={{ flex: '0.5' }}>
+              <button 
+                onClick={() => {
+                  setFilterDate(new Date().toISOString().split('T')[0]);
+                  setFilterProduct('All Products');
+                  setFilterStatus('All Statuses');
+                  setFilterTrigger('All Types');
+                }}
+                className="btn btn-outline" 
+                style={{ height: '40px', width: '100%', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+              >
+                <RefreshCw size={16} />
+              </button>
+            </div>
           </div>
         </div>
 

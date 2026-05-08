@@ -141,9 +141,9 @@ export const AppProvider = ({ children }) => {
         const [rawUsers, rawMasters, rawExceptions, rawAudit, rawHistory, rawNotifs, rawAI, rawPerms, rawRoles] = await Promise.all([
           fetch(`${API_URL}/users`).then(r => r.json()),
           fetch(`${API_URL}/masters`).then(r => r.json()),
-          fetch(`${API_URL}/exceptions`).then(r => r.json()),
+          fetch(`${API_URL}/exceptions?date=${new Date().toISOString().split('T')[0]}`).then(r => r.json()),
           fetch(`${API_URL}/audit-logs`).then(r => r.json()),
-          fetch(`${API_URL}/run-history`).then(r => r.json()),
+          fetch(`${API_URL}/run-history?date=${new Date().toISOString().split('T')[0]}`).then(r => r.json()),
           fetch(`${API_URL}/notifications`).then(r => r.json()),
           fetch(`${API_URL}/ai-suggestions`).then(r => r.json()),
           fetch(`${API_URL}/permissions`).then(r => r.json()),
@@ -338,6 +338,39 @@ export const AppProvider = ({ children }) => {
       console.error(e);
       return [];
     }
+  };
+
+  const fetchFilteredExceptions = async (filters) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.date) params.append('date', filters.date);
+      if (filters.master) params.append('master', filters.master);
+      if (filters.type) params.append('type', filters.type);
+      if (filters.priority) params.append('priority', filters.priority);
+      if (filters.status) params.append('status', filters.status);
+
+      const res = await fetch(`${API_URL}/exceptions?${params.toString()}`);
+      const data = await res.json();
+      if (res.ok) {
+        setExceptions(data.map(normalizeException));
+      }
+    } catch (e) { console.error('Exception Fetch Failed:', e); }
+  };
+
+  const fetchFilteredHistory = async (filters) => {
+    try {
+      const params = new URLSearchParams();
+      if (filters.date) params.append('date', filters.date);
+      if (filters.master) params.append('master', filters.master);
+      if (filters.status) params.append('status', filters.status);
+      if (filters.triggerType) params.append('triggerType', filters.triggerType);
+
+      const res = await fetch(`${API_URL}/run-history?${params.toString()}`);
+      const data = await res.json();
+      if (res.ok) {
+        setRunHistory(data.map(normalizeRunHistory));
+      }
+    } catch (e) { console.error('History Fetch Failed:', e); }
   };
 
   const triggerReconRun = async (masterId, runDate, triggerType) => {
@@ -578,6 +611,7 @@ export const AppProvider = ({ children }) => {
       users, setUsers, addUser, updateUser, deleteUser,
       auditLogs, setAuditLogs, logAudit,
       runHistory, setRunHistory: saveRunHistory,
+      fetchFilteredExceptions, fetchFilteredHistory,
       triggerReconRun, fetchSuggestions,
       exceptionFilters, setExceptionFilters,
       notifications, addNotification, markAllAsRead,
