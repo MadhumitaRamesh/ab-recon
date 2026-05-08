@@ -8,16 +8,26 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-// Database Connection using Unix Socket (macOS)
-const db = mysql.createPool({
-    socketPath: '/tmp/mysql.sock',
-    user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || 'root',
-    database: process.env.DB_NAME || 'ab_recon_db',
-    waitForConnections: true,
-    connectionLimit: 10,
-    queueLimit: 0
-});
+const db = require('./db');
+const { initScheduler } = require('./scheduler');
+
+// --- MIDDLEWARE: RBAC ---
+const checkRole = (allowedRoles) => {
+    return (req, res, next) => {
+        // Simulation: Reading role from header 'x-user-role'
+        // In a production app, this would come from a verified JWT or Session
+        const userRole = req.headers['x-user-role'];
+        
+        if (!userRole) {
+            return res.status(401).json({ error: 'Authentication required.' });
+        }
+
+        if (!allowedRoles.includes(userRole)) {
+            return res.status(403).json({ error: 'You do not have permission to trigger reconciliation runs.' });
+        }
+        next();
+    };
+};
 
 db.getConnection((err, connection) => {
     if (err) {
@@ -25,6 +35,7 @@ db.getConnection((err, connection) => {
     } else {
         console.log('SUCCESS: Connected to Aditya Birla Reconciliation Database (MySQL).');
         connection.release();
+        initScheduler(); // Start automated jobs
     }
 });
 
@@ -234,7 +245,7 @@ app.get('/api/run-history', (req, res) => {
     });
 });
 
-app.post('/api/run-history', (req, res) => {
+app.post('/api/run-history', checkRole(['Admin', 'Ops_Maker']), (req, res) => {
     const { id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time } = req.body;
     db.query(
         'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
