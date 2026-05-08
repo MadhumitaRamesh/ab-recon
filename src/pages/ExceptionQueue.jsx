@@ -14,13 +14,40 @@ import {
   Database,
   Calendar,
   Layers,
-  ArrowUpRight
+  ArrowUpRight,
+  RefreshCw
 } from 'lucide-react';
 
 const ExceptionQueue = () => {
-  const { exceptions, resolveException, addNotification, masters, exceptionFilters, setExceptionFilters } = useApp();
+  const { 
+    exceptions, 
+    resolveException, 
+    addNotification, 
+    masters, 
+    exceptionFilters, 
+    setExceptionFilters,
+    fetchSuggestions
+  } = useApp();
+  
   const [selectedEx, setSelectedEx] = useState(null);
+  const [suggestions, setSuggestions] = useState([]);
+  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [localSearch, setLocalSearch] = useState('');
+
+  // Fetch suggestions when an exception is selected
+  useEffect(() => {
+    const loadSuggestions = async () => {
+      if (selectedEx) {
+        setIsLoadingSuggestions(true);
+        const data = await fetchSuggestions(selectedEx.id);
+        setSuggestions(data);
+        setIsLoadingSuggestions(false);
+      } else {
+        setSuggestions([]);
+      }
+    };
+    loadSuggestions();
+  }, [selectedEx]);
   
   // Advanced filters
   const [masterFilter, setMasterFilter] = useState(exceptionFilters.masterId || 'All');
@@ -45,16 +72,8 @@ const ExceptionQueue = () => {
     return matchesSearch && matchesMaster && matchesRun && matchesType && matchesPriority;
   });
 
-  const getSuggestions = (txn) => {
-    if (!txn) return [];
-    return [
-      { id: 'SUG-01', candidateId: `BK-${txn.id.split('-').pop()}`, amount: txn.amount, confidence: 94, reason: `Exact amount and reference match found in secondary source.` },
-      { id: 'SUG-02', candidateId: `BK-882`, amount: txn.amount, confidence: 82, reason: 'High confidence match based on pattern analysis.' },
-    ];
-  };
-
   const handleAcceptMatch = async (candidate) => {
-    const success = await resolveException(selectedEx.id);
+    const success = await resolveException(selectedEx.id, candidate.id);
     if (success) {
       addNotification({ title: 'Exception Resolved', message: `Transaction ${selectedEx.id} has been matched and closed.` });
       setSelectedEx(null);
@@ -249,22 +268,33 @@ const ExceptionQueue = () => {
 
               <div style={{ fontSize: '12px', fontWeight: '900', color: '#475569', marginBottom: '16px' }}>CANDIDATE MATCHES</div>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {getSuggestions(selectedEx).map((sug, i) => (
-                  <div key={i} className="js-hover-trigger" style={{ padding: '16px', border: '1px solid #E2E8F0', borderRadius: '12px', transition: 'all 0.2s ease', background: 'white' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
-                      <span style={{ fontWeight: '800', fontSize: '13px', color: '#1E293B' }}>{sug.candidateId}</span>
-                      <span style={{ fontSize: '10px', background: '#DCFCE7', color: '#166534', padding: '2px 8px', borderRadius: '4px', fontWeight: '900' }}>{sug.confidence}% MATCH</span>
-                    </div>
-                    <p style={{ fontSize: '12px', color: '#64748B', lineHeight: '1.5', marginBottom: '16px' }}>{sug.reason}</p>
-                    <button 
-                      className="btn btn-primary" 
-                      onClick={() => handleAcceptMatch(sug)} 
-                      style={{ width: '100%', height: '36px', fontSize: '12px', fontWeight: '800', borderRadius: '8px' }}
-                    >
-                      Accept & Clear Exception
-                    </button>
+                {isLoadingSuggestions ? (
+                  <div style={{ textAlign: 'center', padding: '20px', color: '#94A3B8', fontSize: '12px' }}>
+                    <RefreshCw size={24} className="animate-spin" style={{ margin: '0 auto 10px' }} />
+                    Analyzing patterns...
                   </div>
-                ))}
+                ) : suggestions.length > 0 ? (
+                  suggestions.map((sug, i) => (
+                    <div key={i} className="js-hover-trigger" style={{ padding: '16px', border: '1px solid #E2E8F0', borderRadius: '12px', transition: 'all 0.2s ease', background: 'white' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '8px' }}>
+                        <span style={{ fontWeight: '800', fontSize: '13px', color: '#1E293B' }}>{sug.candidateId}</span>
+                        <span style={{ fontSize: '10px', background: '#DCFCE7', color: '#166534', padding: '2px 8px', borderRadius: '4px', fontWeight: '900' }}>{sug.confidence}% MATCH</span>
+                      </div>
+                      <p style={{ fontSize: '12px', color: '#64748B', lineHeight: '1.5', marginBottom: '16px' }}>{sug.reason}</p>
+                      <button 
+                        className="btn btn-primary" 
+                        onClick={() => handleAcceptMatch(sug)} 
+                        style={{ width: '100%', height: '36px', fontSize: '12px', fontWeight: '800', borderRadius: '8px' }}
+                      >
+                        Accept & Clear Exception
+                      </button>
+                    </div>
+                  ))
+                ) : (
+                  <div style={{ textAlign: 'center', padding: '20px', color: '#94A3B8', fontSize: '12px' }}>
+                    No candidates found for this exception.
+                  </div>
+                )}
               </div>
 
               <div style={{ marginTop: '24px', paddingTop: '20px', borderTop: '1px solid #F1F5F9', textAlign: 'center' }}>

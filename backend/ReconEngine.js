@@ -54,7 +54,9 @@ async function runReconciliation(masterConfig, sourceData, runDate, triggerType)
                     recon_master_id: masterConfig.id,
                     run_id: runId,
                     run_date: runDate,
-                    source_type: 'System'
+                    source_type: 'System',
+                    unique_reference_number: txnA.unique_reference_number || 'N/A',
+                    assigned_role: 'Operations Maker'
                 });
             }
         });
@@ -74,7 +76,9 @@ async function runReconciliation(masterConfig, sourceData, runDate, triggerType)
                     recon_master_id: masterConfig.id,
                     run_id: runId,
                     run_date: runDate,
-                    source_type: 'System'
+                    source_type: 'System',
+                    unique_reference_number: txnB.unique_reference_number || 'N/A',
+                    assigned_role: 'Operations Maker'
                 });
             });
         });

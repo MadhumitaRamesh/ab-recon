@@ -188,10 +188,39 @@ app.delete('/api/masters/:id', (req, res) => {
 
 // --- EXCEPTIONS ---
 app.get('/api/exceptions', (req, res) => {
-    db.query('SELECT e.*, m.name as product_name FROM exceptions e LEFT JOIN masters m ON e.recon_master_id = m.id ORDER BY e.run_date DESC', (err, results) => {
+    const sql = `
+        SELECT 
+            e.*, 
+            m.name as product_name 
+        FROM exceptions e 
+        LEFT JOIN masters m ON e.recon_master_id = m.id 
+        ORDER BY e.run_date DESC, e.id DESC
+    `;
+    db.query(sql, (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
+});
+
+app.get('/api/suggestions/:exceptionId', (req, res) => {
+    // Simulation of Intelligence Engine matching
+    // In a production app, this would query a vector DB or matching algorithm
+    const { exceptionId } = req.params;
+    const suggestions = [
+        { 
+            id: `SUG-${Math.floor(Math.random() * 900) + 100}`, 
+            candidateId: `BK-${exceptionId.split('-').pop()}`, 
+            confidence: 94, 
+            reason: "Exact amount and reference match found in secondary source ledger." 
+        },
+        { 
+            id: `SUG-${Math.floor(Math.random() * 900) + 100}`, 
+            candidateId: `SYS-882`, 
+            confidence: 82, 
+            reason: "High confidence pattern match based on historical reconciliation behavior." 
+        }
+    ];
+    res.json(suggestions);
 });
 
 app.post('/api/exceptions/bulk', (req, res) => {
@@ -200,11 +229,11 @@ app.post('/api/exceptions/bulk', (req, res) => {
 
     const values = exceptions.map(e => [
         e.id, e.amount, e.ref_no, e.type, e.age, e.priority, e.status, 
-        e.recon_master_id, e.run_id, e.run_date, e.source_type
+        e.recon_master_id, e.run_id, e.run_date, e.source_type, e.unique_reference_number, e.assigned_role
     ]);
 
     db.query(
-        'INSERT INTO exceptions (id, amount, ref_no, type, age, priority, status, recon_master_id, run_id, run_date, source_type) VALUES ?',
+        'INSERT INTO exceptions (id, amount, ref_no, type, age, priority, status, recon_master_id, run_id, run_date, source_type, unique_reference_number, assigned_role) VALUES ?',
         [values],
         (err) => {
             if (err) return res.status(500).json({ error: err.message });

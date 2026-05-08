@@ -103,7 +103,9 @@ export const AppProvider = ({ children }) => {
     product: e.product_name || 'Unknown',
     runId: e.run_id,
     runDate: e.run_date ? new Date(e.run_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '--',
-    sourceType: e.source_type
+    sourceType: e.source_type,
+    uniqueRef: e.unique_reference_number,
+    assignedRole: e.assigned_role || 'Operations'
   });
 
   const normalizeNotification = (n) => ({
@@ -325,6 +327,17 @@ export const AppProvider = ({ children }) => {
       setMasters(prev => [...prev, { ...master, id: Date.now() }]);
     }
     return false;
+  };
+
+  const fetchSuggestions = async (exceptionId) => {
+    try {
+      const res = await fetch(`${API_URL}/suggestions/${exceptionId}`);
+      if (!res.ok) throw new Error('Failed to fetch suggestions');
+      return await res.json();
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
   };
 
   const generateExceptionsForRun = async (runId, masterId, runDate, count) => {
@@ -567,7 +580,7 @@ export const AppProvider = ({ children }) => {
       users, setUsers, addUser, updateUser, deleteUser,
       auditLogs, setAuditLogs, logAudit,
       runHistory, setRunHistory: saveRunHistory,
-      generateExceptionsForRun,
+      generateExceptionsForRun, fetchSuggestions,
       exceptionFilters, setExceptionFilters,
       notifications, addNotification, markAllAsRead,
       searchQuery, setSearchQuery,
