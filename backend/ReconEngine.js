@@ -106,6 +106,14 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
             );
         }
 
+        // 3. Write Forensic Audit Log — links runId to audit trail
+        await db.promise().query(
+            'INSERT INTO audit_logs (user_name, action, module, detail, log_time, log_date, type) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            ['SYSTEM', 'Recon Completed', 'Engine',
+             `Cycle ${runId} for ${masterConfig.name} completed. Matched: ${matchedCount}, Exceptions: ${exceptionCount}`,
+             new Date().toLocaleTimeString('en-GB', { hour12: false }), runDate, 'System']
+        );
+
         return { success: true, runId, matchedCount, exceptionCount };
 
     } catch (error) {
