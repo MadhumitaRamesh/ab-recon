@@ -11,6 +11,7 @@ app.use(express.json());
 const db = require('./db');
 const { initScheduler } = require('./scheduler');
 const jwt = require('jsonwebtoken');
+const { runReconciliation } = require('./ReconEngine');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'abc-recon-secret-key-2026';
 
@@ -317,6 +318,35 @@ app.post('/api/run-history', checkRole(['Admin', 'Ops_Maker']), (req, res) => {
             res.json({ success: true });
         }
     );
+});
+
+app.post('/api/recon/trigger', checkRole(['Admin', 'Ops_Maker']), async (req, res) => {
+    const { masterId, runDate, triggerType } = req.body;
+    
+    try {
+        // Fetch Master Config
+        db.query('SELECT * FROM masters WHERE id = ?', [masterId], async (err, masters) => {
+            if (err || masters.length === 0) return res.status(404).json({ error: 'Master not found' });
+            
+            const master = masters[0];
+            // Mock source data for matching
+            const mockSourceData = {
+                s1: [
+                    { amount: 1200.50, reference_number: 'TXN-9920', unique_reference_number: 'URN-A-1' },
+                    { amount: 550.00, reference_number: 'TXN-9921', unique_reference_number: 'URN-A-2' }
+                ],
+                s2: [
+                    { amount: 1200.50, reference_number: 'TXN-9920', unique_reference_number: 'URN-A-1' }
+                    // 550.00 is missing, will create exception
+                ]
+            };
+
+            const result = await runReconciliation(master, mockSourceData, runDate, triggerType || 'Manual');
+            res.json(result);
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
 });
 
 // --- USERS ---

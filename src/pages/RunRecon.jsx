@@ -26,7 +26,7 @@ const RunRecon = () => {
     setRunHistory, 
     masters, 
     user, 
-    generateExceptionsForRun, 
+    triggerReconRun, 
     setActivePage, 
     setExceptionFilters 
   } = useApp();
@@ -96,35 +96,12 @@ const RunRecon = () => {
   }, [isRunning, stepIndex, selectedMaster]);
 
   const finalizeRun = async () => {
-    const runId = `RUN-${Math.floor(Math.random() * 900) + 100}`;
-    const now = new Date();
-    // Create detailed timing for forensics
-    const startTime = new Date(now.getTime() - 45000).toLocaleTimeString('en-GB', { hour12: false });
-    const endTime = now.toLocaleTimeString('en-GB', { hour12: false });
-    
-    const exceptionCount = Math.floor(Math.random() * 15) + 5;
-    
-    const newRun = { 
-      id: runId, 
-      product: selectedMaster?.name || 'Master', 
-      status: 'Completed', 
-      triggerType: selectedMaster?.run_mode || 'Manual',
-      matched: '4,218', 
-      exceptions: exceptionCount.toString(), 
-      rawTime: endTime,
-      startTime: startTime,
-      endTime: endTime,
-      rawDate: runDate
-    };
-    
     try {
-      await setRunHistory(newRun);
-      await generateExceptionsForRun(runId, selectedMaster.id, runDate, exceptionCount);
-      
-      addNotification({ title: 'Recon Success', message: `${selectedMaster?.name} cycle completed. ${exceptionCount} exceptions logged.` });
-      logAudit('Manual Run Success', 'Engine', `Cycle ${runId} for ${selectedMaster?.name} verified.`, 'Operations');
+      const result = await triggerReconRun(selectedMaster.id, runDate, selectedMaster.run_mode || 'Manual');
+      addNotification({ title: 'Recon Success', message: `${selectedMaster?.name} cycle completed. ${result.exceptionCount} exceptions logged.` });
     } catch (e) {
-      console.error('History update failed', e);
+      addNotification({ title: 'Recon Failed', message: `Execution error: ${e.message}`, type: 'error' });
+      console.error('Execution update failed', e);
     }
     
     setIsRunning(false);

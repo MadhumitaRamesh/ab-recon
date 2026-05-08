@@ -264,8 +264,9 @@ export const AppProvider = ({ children }) => {
       });
       const data = await res.json();
       if (res.ok && data.success) {
-        setUser(data.user);
-        localStorage.setItem('ab_recon_user', JSON.stringify(data.user));
+        const fullUser = { ...data.user, token: data.token };
+        setUser(fullUser);
+        localStorage.setItem('ab_recon_user', JSON.stringify(fullUser));
         logAudit('Secure Session Start', 'Auth', `User ${employeeId} authenticated via bcrypt`, 'Security');
         return true;
       }
@@ -339,41 +340,36 @@ export const AppProvider = ({ children }) => {
     }
   };
 
-  const generateExceptionsForRun = async (runId, masterId, runDate, count) => {
+  const triggerReconRun = async (masterId, runDate, triggerType) => {
     try {
-      const exceptions = [];
-      const types = ['Amount Mismatch', 'Duplicate Reference', 'Missing Side-B', 'Invalid Date'];
-      const priorities = ['High', 'Medium', 'Low'];
-      
-      for (let i = 0; i < count; i++) {
-        exceptions.push({
-          id: `EX-${runId}-${i+1}`,
-          amount: (Math.random() * 10000).toFixed(2),
-          ref_no: `TXN-${Math.floor(Math.random() * 90000) + 10000}`,
-          type: types[Math.floor(Math.random() * types.length)],
-          age: '0 days',
-          priority: priorities[Math.floor(Math.random() * priorities.length)],
-          status: 'Open',
-          recon_master_id: masterId,
-          run_id: runId,
-          run_date: runDate,
-          source_type: 'Manual/Auto'
-        });
-      }
-
-      await fetch(`${API_URL}/exceptions/bulk`, {
+      const res = await fetch(`${API_URL}/recon/trigger`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ exceptions })
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.token}`
+        },
+        body: JSON.stringify({ masterId, runDate, triggerType })
       });
-
-      // Refresh exceptions list
-      const rawExceptions = await fetch(`${API_URL}/exceptions`).then(r => r.json());
-      setExceptions(rawExceptions.map(normalizeException));
+      const result = await res.json();
       
-      logAudit('Exceptions Generated', 'Engine', `${count} exceptions logged for Run ${runId}`, 'Operations');
+      if (res.ok && result.success) {
+        // Refresh history and exceptions
+        const [rawHistory, rawExceptions] = await Promise.all([
+          fetch(`${API_URL}/run-history`).then(r => r.json()),
+          fetch(`${API_URL}/exceptions`).then(r => r.json())
+        ]);
+        
+        setRunHistory(rawHistory.map(normalizeRunHistory));
+        setExceptions(rawExceptions.map(normalizeException));
+        
+        logAudit('Manual Run Success', 'Engine', `Cycle ${result.runId} completed. Matched: ${result.matchedCount}`, 'Operations');
+        return result;
+      } else {
+        throw new Error(result.error || 'Recon execution failed');
+      }
     } catch (e) {
-      console.error('Failed to generate exceptions', e);
+      console.error('Recon Trigger Failed:', e);
+      throw e;
     }
   };
 
@@ -381,7 +377,10 @@ export const AppProvider = ({ children }) => {
     try {
       const res = await fetch(`${API_URL}/run-history`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${user?.token}`
+        },
         body: JSON.stringify({
           id: newRun.id,
           product: newRun.product,
@@ -579,7 +578,7 @@ export const AppProvider = ({ children }) => {
       users, setUsers, addUser, updateUser, deleteUser,
       auditLogs, setAuditLogs, logAudit,
       runHistory, setRunHistory: saveRunHistory,
-      generateExceptionsForRun, fetchSuggestions,
+      triggerReconRun, fetchSuggestions,
       exceptionFilters, setExceptionFilters,
       notifications, addNotification, markAllAsRead,
       searchQuery, setSearchQuery,
