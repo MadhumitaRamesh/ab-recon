@@ -163,10 +163,29 @@ app.delete('/api/masters/:id', (req, res) => {
 
 // --- EXCEPTIONS ---
 app.get('/api/exceptions', (req, res) => {
-    db.query('SELECT * FROM exceptions', (err, results) => {
+    db.query('SELECT e.*, m.name as product_name FROM exceptions e LEFT JOIN masters m ON e.recon_master_id = m.id ORDER BY e.run_date DESC', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
+});
+
+app.post('/api/exceptions/bulk', (req, res) => {
+    const { exceptions } = req.body;
+    if (!exceptions || !Array.isArray(exceptions)) return res.status(400).json({ error: 'Invalid payload' });
+
+    const values = exceptions.map(e => [
+        e.id, e.amount, e.ref_no, e.type, e.age, e.priority, e.status, 
+        e.recon_master_id, e.run_id, e.run_date, e.source_type
+    ]);
+
+    db.query(
+        'INSERT INTO exceptions (id, amount, ref_no, type, age, priority, status, recon_master_id, run_id, run_date, source_type) VALUES ?',
+        [values],
+        (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, count: values.length });
+        }
+    );
 });
 
 app.post('/api/exceptions', (req, res) => {
@@ -216,10 +235,10 @@ app.get('/api/run-history', (req, res) => {
 });
 
 app.post('/api/run-history', (req, res) => {
-    const { id, product, status, trigger_type, matched_count, exception_count, run_date, run_time } = req.body;
+    const { id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time } = req.body;
     db.query(
-        'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-        [id, product, status, trigger_type, matched_count, exception_count, run_date, run_time],
+        'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time],
         (err) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true });

@@ -18,6 +18,7 @@ export const AppProvider = ({ children }) => {
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [exceptionFilters, setExceptionFilters] = useState({ runId: '', masterId: '' });
 
   const modules = [
     'Dashboard', 'Recon Masters', 'Run Recon', 'Run History', 'Exception Queue',
@@ -95,9 +96,14 @@ export const AppProvider = ({ children }) => {
     amount: e.amount ? Number(e.amount).toLocaleString('en-IN', { minimumFractionDigits: 2 }) : '0.00',
     ref: e.ref_no,
     type: e.type,
-    age: e.age,
+    age: e.age || '0 days',
     priority: e.priority,
-    status: e.status
+    status: e.status,
+    masterId: e.recon_master_id,
+    product: e.product_name || 'Unknown',
+    runId: e.run_id,
+    runDate: e.run_date ? new Date(e.run_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '--',
+    sourceType: e.source_type
   });
 
   const normalizeNotification = (n) => ({
@@ -321,6 +327,44 @@ export const AppProvider = ({ children }) => {
     return false;
   };
 
+  const generateExceptionsForRun = async (runId, masterId, runDate, count) => {
+    try {
+      const exceptions = [];
+      const types = ['Amount Mismatch', 'Duplicate Reference', 'Missing Side-B', 'Invalid Date'];
+      const priorities = ['High', 'Medium', 'Low'];
+      
+      for (let i = 0; i < count; i++) {
+        exceptions.push({
+          id: `EX-${runId}-${i+1}`,
+          amount: (Math.random() * 10000).toFixed(2),
+          ref_no: `TXN-${Math.floor(Math.random() * 90000) + 10000}`,
+          type: types[Math.floor(Math.random() * types.length)],
+          age: '0 days',
+          priority: priorities[Math.floor(Math.random() * priorities.length)],
+          status: 'Open',
+          recon_master_id: masterId,
+          run_id: runId,
+          run_date: runDate,
+          source_type: 'Manual/Auto'
+        });
+      }
+
+      await fetch(`${API_URL}/exceptions/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ exceptions })
+      });
+
+      // Refresh exceptions list
+      const rawExceptions = await fetch(`${API_URL}/exceptions`).then(r => r.json());
+      setExceptions(rawExceptions.map(normalizeException));
+      
+      logAudit('Exceptions Generated', 'Engine', `${count} exceptions logged for Run ${runId}`, 'Operations');
+    } catch (e) {
+      console.error('Failed to generate exceptions', e);
+    }
+  };
+
   const saveRunHistory = async (newRun) => {
     try {
       const res = await fetch(`${API_URL}/run-history`, {
@@ -523,6 +567,8 @@ export const AppProvider = ({ children }) => {
       users, setUsers, addUser, updateUser, deleteUser,
       auditLogs, setAuditLogs, logAudit,
       runHistory, setRunHistory: saveRunHistory,
+      generateExceptionsForRun,
+      exceptionFilters, setExceptionFilters,
       notifications, addNotification, markAllAsRead,
       searchQuery, setSearchQuery,
       sidebarOpen, setSidebarOpen,
