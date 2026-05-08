@@ -67,10 +67,13 @@ export const AppProvider = ({ children }) => {
     id: r.id,
     product: r.product,
     status: r.status,
+    triggerType: r.trigger_type || 'Manual',
     matched: r.matched_count,
     exceptions: r.exception_count,
     time: r.run_time ? r.run_time.substring(0, 5) : '--',
-    date: r.run_date ? new Date(r.run_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '--'
+    date: r.run_date ? new Date(r.run_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '--',
+    rawDate: r.run_date,
+    rawTime: r.run_time
   });
 
   const normalizeAuditLog = (a) => ({
@@ -317,20 +320,29 @@ export const AppProvider = ({ children }) => {
   };
 
   const saveRunHistory = async (newRun) => {
-    setRunHistory(prev => [newRun, ...prev]);
     try {
-      await fetch(`${API_URL}/run-history`, {
+      const res = await fetch(`${API_URL}/run-history`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           id: newRun.id,
           product: newRun.product,
           status: newRun.status,
+          trigger_type: newRun.triggerType || 'Manual',
           matched_count: newRun.matched,
-          exception_count: newRun.exceptions
+          exception_count: newRun.exceptions,
+          run_date: newRun.rawDate,
+          run_time: newRun.rawTime
         })
       });
-    } catch (e) {}
+      if (res.ok) {
+        // Refresh history to get ordered list
+        const rawHistory = await fetch(`${API_URL}/run-history`).then(r => r.json());
+        setRunHistory(rawHistory.map(normalizeRunHistory));
+      }
+    } catch (e) {
+      setRunHistory(prev => [newRun, ...prev]);
+    }
   };
 
   const deleteRole = async (id, name) => {

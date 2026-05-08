@@ -124,24 +124,29 @@ app.post('/api/permissions', (req, res) => {
 app.get('/api/masters', (req, res) => {
     db.query('SELECT * FROM masters', (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json(results);
+        // Parse JSON for frontend
+        const parsed = results.map(r => ({
+            ...r,
+            source_config: typeof r.source_config === 'string' ? JSON.parse(r.source_config) : r.source_config
+        }));
+        res.json(parsed);
     });
 });
 
 app.post('/api/masters', (req, res) => {
-    const { name, frequency, type, sources, status } = req.body;
-    db.query('INSERT INTO masters (name, frequency, type, sources, status) VALUES (?, ?, ?, ?, ?)',
-    [name, frequency, type, sources, status], (err, results) => {
+    const { name, frequency, matching_logic, run_mode, source_config, status } = req.body;
+    db.query('INSERT INTO masters (name, frequency, matching_logic, run_mode, source_config, status) VALUES (?, ?, ?, ?, ?, ?)',
+    [name, frequency, matching_logic, run_mode, JSON.stringify(source_config), status], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ id: results.insertId, ...req.body });
     });
 });
 
 app.put('/api/masters/:id', (req, res) => {
-    const { name, frequency, type, sources, status } = req.body;
+    const { name, frequency, matching_logic, run_mode, source_config, status } = req.body;
     db.query(
-        'UPDATE masters SET name = ?, frequency = ?, type = ?, sources = ?, status = ? WHERE id = ?',
-        [name, frequency, type, sources, status, req.params.id],
+        'UPDATE masters SET name = ?, frequency = ?, matching_logic = ?, run_mode = ?, source_config = ?, status = ? WHERE id = ?',
+        [name, frequency, matching_logic, run_mode, JSON.stringify(source_config), status, req.params.id],
         (err) => {
             if (err) return res.status(500).json({ error: err.message });
             res.json({ success: true });
@@ -211,14 +216,15 @@ app.get('/api/run-history', (req, res) => {
 });
 
 app.post('/api/run-history', (req, res) => {
-    const { id, product, status, matched_count, exception_count } = req.body;
-    const time = new Date().toLocaleTimeString('en-GB', { hour12: false });
-    const date = new Date().toISOString().split('T')[0];
-    db.query('INSERT INTO run_history (id, product, status, matched_count, exception_count, run_time, run_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [id, product, status, matched_count, exception_count, time, date], (err) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ success: true });
-    });
+    const { id, product, status, trigger_type, matched_count, exception_count, run_date, run_time } = req.body;
+    db.query(
+        'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        [id, product, status, trigger_type, matched_count, exception_count, run_date, run_time],
+        (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true });
+        }
+    );
 });
 
 // --- USERS ---

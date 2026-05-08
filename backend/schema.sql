@@ -131,3 +131,11 @@ INSERT INTO audit_logs (user_name, action, module, detail, log_time, log_date, t
 INSERT INTO ai_suggestions (id, type, confidence, detail, recommended_action) VALUES 
 ('AI-201', 'Pattern Match', 98, 'Recurring ₹5,000 mismatch detected in UPI logs.', 'Bulk Resolve'),
 ('AI-202', 'Anomaly Detection', 85, 'Transaction TXN-8821 shows 48h settlement lag.', 'Flag for Review');
+
+-- Exceptions
+INSERT INTO exceptions (id, amount, ref_no, type, age, priority, status) VALUES 
+('TXN-4122', 15000.00, 'ABC123456789', 'Amount Mismatch', '48h', 'High', 'Unresolved'),
+('TXN-4123', 2500.00, 'DEP-998877', 'Missing Entry', '24h', 'Medium', 'Pending Review'),
+('TXN-4124', 50000.00, 'UPI-776655', 'Duplicate', '72h', 'High', 'Unresolved'),
+('TXN-4125', 1240.50, 'BBPS-223344', 'Variance', '12h', 'Low', 'Investigating'),
+('TXN-4126', 8900.00, 'CASH-112233', 'Source Mismatch', '36h', 'Medium', 'Unresolved');

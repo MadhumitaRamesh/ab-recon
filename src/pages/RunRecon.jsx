@@ -1,17 +1,37 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
-import { Play, Terminal, Cpu, Database, ShieldCheck, CheckCircle2, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
+import { 
+  Play, 
+  Terminal, 
+  Database, 
+  RefreshCw, 
+  CheckCircle, 
+  FileUp, 
+  Search, 
+  Filter, 
+  Calendar,
+  Clock,
+  Activity,
+  History,
+  ArrowRight
+} from 'lucide-react';
 
 const RunRecon = () => {
-  const { addNotification, logAudit, setRunHistory, masters, user } = useApp();
-  const [selectedProduct, setSelectedProduct] = useState('');
+  const { addNotification, logAudit, runHistory, setRunHistory, masters, user } = useApp();
+  const [selectedMasterId, setSelectedMasterId] = useState('');
+  const [runDate, setRunDate] = useState(new Date().toISOString().split('T')[0]);
   const [isRunning, setIsRunning] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
-  const [terminalLogs, setTerminalLogs] = useState(['> System Idle. Secure Socket Connection Active.']);
-  const [engineStatus, setEngineStatus] = useState('STANDBY');
+  const [terminalLogs, setTerminalLogs] = useState(['> System Standby. Waiting for execution trigger...']);
   const [stepIndex, setStepIndex] = useState(-1);
   const terminalRef = useRef(null);
   const finishTriggered = useRef(false);
+
+  // Filter states for history
+  const [filterText, setFilterText] = useState('');
+  const [statusFilter, setStatusFilter] = useState('All');
+
+  const selectedMaster = masters.find(m => m.id === parseInt(selectedMasterId));
 
   useEffect(() => {
     if (terminalRef.current) {
@@ -20,17 +40,14 @@ const RunRecon = () => {
   }, [terminalLogs]);
 
   const sequence = [
-    { msg: '> Verifying SFTP secure handshake...', delay: 600 },
-    { msg: '> Handshake Success. Protocol: TLS 1.3', delay: 400 },
-    { msg: `> Requesting data stream from master...`, delay: 800 },
-    { msg: '> Internal Ledger: 4,220 entries ingested.', delay: 700 },
-    { msg: '> External Statement: 4,218 entries ingested.', delay: 700 },
-    { msg: '> Initializing AI Match Engine...', delay: 1000 },
-    { msg: '> Processing mapping logic: [TXN_REF] -> [UTN_ID]', delay: 800 },
-    { msg: '> Anomaly Detected: 2 records pending review.', delay: 600 },
-    { msg: '> Syncing results to audit trail...', delay: 800 },
-    { msg: '> BUILD SUCCESSFUL', delay: 500 },
-    { msg: '> Recon Cycle Terminated. Exit Code: 0', delay: 300 }
+    { msg: '> Validating secure handshake with ingestion gateway...', delay: 500 },
+    { msg: '> Handshake Success. Protocol: TLS 1.3 | AES-256', delay: 300 },
+    { msg: '> Checking file integrity and checksums...', delay: 600 },
+    { msg: '> Data stream initialized. Mapping logic: [TXN_REF] -> [UTN_ID]', delay: 800 },
+    { msg: '> Parallel match processing started (Worker Threads: 8)...', delay: 1000 },
+    { msg: '> Pattern analysis complete. 0.05% variance detected.', delay: 700 },
+    { msg: '> Syncing results to forensic vault...', delay: 600 },
+    { msg: '> BUILD SUCCESSFUL. Recon Cycle Terminated.', delay: 400 }
   ];
 
   useEffect(() => {
@@ -39,7 +56,7 @@ const RunRecon = () => {
       const delay = stepIndex === -1 ? 0 : sequence[stepIndex].delay;
       timer = setTimeout(() => {
         if (stepIndex === -1) {
-          setTerminalLogs([`> Starting Recon Engine for [${selectedProduct || 'System'}]...`]);
+          setTerminalLogs([`> Initializing Recon Engine for [${selectedMaster?.name}]...`]);
           setStepIndex(0);
         } else {
           setTerminalLogs(prev => [...prev, sequence[stepIndex].msg]);
@@ -48,186 +65,257 @@ const RunRecon = () => {
       }, delay);
     } else if (isRunning && stepIndex === sequence.length && !finishTriggered.current) {
       finishTriggered.current = true;
-      // Use a slight delay to ensure the last log is rendered before state transition
-      setTimeout(() => {
-        finalizeBuild();
-      }, 500);
+      setTimeout(() => finalizeRun(), 500);
     }
     return () => clearTimeout(timer);
-  }, [isRunning, stepIndex, selectedProduct]);
+  }, [isRunning, stepIndex]);
 
-  const finalizeBuild = () => {
-    try {
-      const runId = `RUN-${Math.floor(Math.random() * 900) + 100}`;
-      const newRun = { 
-        id: runId, 
-        product: selectedProduct || 'General Master', 
-        status: 'Completed', 
-        matched: '4,218', 
-        exceptions: '2', 
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        date: new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2026' })
-      };
-      
-      // Batch context updates safely
-      setRunHistory(prev => Array.isArray(prev) ? [newRun, ...prev] : [newRun]);
-      addNotification({ title: 'Build Success', message: `${selectedProduct} cycle verified.` });
-      logAudit('Execution Success', 'Console', `Batch ${runId} finished successfully.`, 'Auto');
-      
-      setIsRunning(false);
-      setIsFinished(true);
-      setEngineStatus('COMPLETED');
-    } catch (err) {
-      console.error('Finalization Failure:', err);
-      setIsRunning(false);
-      setEngineStatus('ERROR');
-    }
+  const finalizeRun = async () => {
+    const runId = `RUN-${Math.floor(Math.random() * 900) + 100}`;
+    const now = new Date();
+    const newRun = { 
+      id: runId, 
+      product: selectedMaster?.name || 'Master', 
+      status: 'Completed', 
+      triggerType: selectedMaster?.run_mode || 'Manual',
+      matched: '4,218', 
+      exceptions: Math.floor(Math.random() * 5).toString(), 
+      rawTime: now.toLocaleTimeString('en-GB', { hour12: false }),
+      rawDate: runDate
+    };
+    
+    await setRunHistory(newRun); // This now handles persistence in AppContext
+    addNotification({ title: 'Recon Success', message: `${selectedMaster?.name} cycle completed.` });
+    logAudit('Manual Run Success', 'Engine', `Cycle ${runId} for ${selectedMaster?.name} verified.`, 'Operations');
+    
+    setIsRunning(false);
+    setIsFinished(true);
   };
 
   const startEngine = () => {
-    if (!selectedProduct) {
-      setTerminalLogs(prev => [...prev, '> ERROR: No Product Master selected.']);
-      return;
-    }
+    if (!selectedMaster) return;
     finishTriggered.current = false;
     setIsFinished(false);
     setStepIndex(-1);
     setIsRunning(true);
-    setEngineStatus('EXECUTING');
-    logAudit('Manual Run Triggered', 'Console', `Engine initialized for ${selectedProduct}`, 'System');
+    logAudit('Execution Triggered', 'Engine', `Manual trigger for ${selectedMaster.name} on ${runDate}`, 'System');
   };
 
-  if (!user) return null;
+  const filteredHistory = runHistory.filter(r => {
+    const matchesSearch = r.product.toLowerCase().includes(filterText.toLowerCase()) || r.id.toLowerCase().includes(filterText.toLowerCase());
+    const matchesStatus = statusFilter === 'All' || r.status === statusFilter;
+    return matchesSearch && matchesStatus;
+  });
 
   return (
-    <div className="main-content animate-reveal">
-      <div style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div>
-          <h1 style={{ fontSize: '32px', color: '#0F172A', fontWeight: '800' }}>Recon Engine Console</h1>
-          <p style={{ color: '#64748B', fontSize: '16px', marginTop: '6px' }}>Secure execution gateway for Aditya Birla Reconciliation Core.</p>
+    <div className="main-content">
+      <div style={{ marginBottom: '32px' }}>
+        <h1 style={{ fontSize: '28px', color: '#0F172A', fontWeight: '800' }}>Operational Hub</h1>
+        <p style={{ color: '#64748B', fontSize: '15px', marginTop: '4px' }}>Unified gateway for reconciliation execution and historical auditing.</p>
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '48px' }}>
+        {/* EXECUTION PANEL */}
+        <div className="card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', borderTop: '4px solid var(--primary)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
+            <div style={{ padding: '8px', background: 'var(--primary-light)', borderRadius: '10px' }}>
+              <Activity size={20} color="var(--primary)" />
+            </div>
+            <h3 style={{ fontSize: '18px', fontWeight: '800' }}>Trigger Reconciliation</h3>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
+            <div className="form-group">
+              <label className="form-label" style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748B' }}>Product Master</label>
+              <select 
+                className="form-control" 
+                value={selectedMasterId} 
+                onChange={(e) => setSelectedMasterId(e.target.value)}
+                disabled={isRunning}
+              >
+                <option value="">-- Select Configuration --</option>
+                {masters.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
+              </select>
+            </div>
+            <div className="form-group">
+              <label className="form-label" style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748B' }}>Run Date</label>
+              <input 
+                type="date" 
+                className="form-control" 
+                value={runDate} 
+                onChange={(e) => setRunDate(e.target.value)}
+                disabled={isRunning}
+              />
+            </div>
+          </div>
+
+          {selectedMaster && (
+            <div className="animate-reveal" style={{ flex: 1, padding: '24px', background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '32px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
+                <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary)' }}>INGESTION REQUIREMENTS</span>
+                <span style={{ fontSize: '11px', fontWeight: '700', background: '#E2E8F0', padding: '2px 8px', borderRadius: '4px' }}>{selectedMaster.run_mode.toUpperCase()}</span>
+              </div>
+              
+              {selectedMaster.run_mode === 'Manual' ? (
+                <div style={{ display: 'grid', gap: '12px' }}>
+                  {selectedMaster.source_config.map(source => (
+                    <div key={source.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'white', borderRadius: '10px', border: '1px solid #F1F5F9' }}>
+                      <div>
+                        <div style={{ fontSize: '13px', fontWeight: '700' }}>{source.name}</div>
+                        <div style={{ fontSize: '11px', color: '#94A3B8' }}>{source.type}</div>
+                      </div>
+                      <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', fontSize: '12px', fontWeight: '700' }}>
+                        <FileUp size={16} /> Upload CSV
+                        <input type="file" style={{ display: 'none' }} disabled={isRunning} />
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ textAlign: 'center', padding: '20px' }}>
+                  <RefreshCw size={24} color="#94A3B8" className={isRunning ? 'animate-spin' : ''} style={{ marginBottom: '12px' }} />
+                  <p style={{ fontSize: '13px', color: '#64748B' }}>This master is configured for <strong>{selectedMaster.run_mode}</strong>. Ingestion will be triggered automatically upon execution.</p>
+                </div>
+              )}
+            </div>
+          )}
+
+          <button 
+            className="btn btn-primary" 
+            onClick={startEngine} 
+            disabled={!selectedMaster || isRunning}
+            style={{ width: '100%', height: '54px', fontSize: '15px', fontWeight: '800', borderRadius: '12px' }}
+          >
+            {isRunning ? (
+              <><RefreshCw size={18} className="animate-spin" /> RUNNING ENGINE...</>
+            ) : (
+              <><Play size={18} fill="white" /> INITIALIZE RECONCILIATION</>
+            )}
+          </button>
         </div>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <div style={{ background: '#F8FAFC', padding: '12px 24px', borderRadius: '12px', border: '1px solid #E2E8F0', display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: isRunning ? 'var(--gold)' : isFinished ? '#10B981' : '#CBD5E1', boxShadow: isRunning ? '0 0 15px var(--gold)' : 'none' }}></div>
-            <span style={{ fontSize: '14px', fontWeight: '900', color: '#1E293B' }}>ENGINE STATUS: {engineStatus}</span>
+
+        {/* TERMINAL PANEL */}
+        <div style={{ 
+          background: '#0F172A', 
+          borderRadius: '24px', 
+          padding: '24px', 
+          display: 'flex',
+          flexDirection: 'column',
+          border: '6px solid #1E293B',
+          boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+          height: '100%'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '20px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '16px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+              <Terminal size={16} color="var(--gold)" />
+              <span style={{ color: 'white', fontSize: '11px', fontWeight: '900', letterSpacing: '1px' }}>RECON CONSOLE V2.4</span>
+            </div>
+            <div style={{ display: 'flex', gap: '6px' }}>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#EF4444' }}></div>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#F59E0B' }}></div>
+              <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10B981' }}></div>
+            </div>
+          </div>
+          
+          <div 
+            ref={terminalRef}
+            style={{ 
+              flex: 1, 
+              overflowY: 'auto', 
+              fontFamily: '"Fira Code", monospace', 
+              fontSize: '13px', 
+              color: '#94A3B8', 
+              lineHeight: '1.8',
+              padding: '10px'
+            }}
+          >
+            {terminalLogs.map((log, i) => (
+              <div key={i} style={{ 
+                color: log.includes('SUCCESS') ? '#10B981' : log.includes('ERROR') ? '#EF4444' : log.includes('Starting') || log.includes('Initializing') ? 'white' : '#94A3B8'
+              }}>
+                {log}
+              </div>
+            ))}
+            {isRunning && <div className="animate-pulse" style={{ display: 'inline-block', width: '8px', height: '16px', background: 'var(--gold)', verticalAlign: 'middle', marginLeft: '6px' }}></div>}
           </div>
         </div>
       </div>
 
-      <div className="grid-2-1" style={{ gap: '32px' }}>
-        <div className="card" style={{ padding: '32px', display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ fontSize: '18px', fontWeight: '900', marginBottom: '32px', display: 'flex', alignItems: 'center', gap: '12px', color: '#1E293B' }}>
-             <Database size={22} color="var(--primary)" /> CONFIGURATION
-          </h3>
-          
-          <div className="form-group" style={{ marginBottom: '32px' }}>
-            <label className="form-label" style={{ fontWeight: '800', color: '#475569', fontSize: '12px', textTransform: 'uppercase', marginBottom: '12px', display: 'block' }}>Target Product Master</label>
+      {/* HISTORY TABLE */}
+      <div className="card" style={{ padding: '0', overflow: 'hidden' }}>
+        <div style={{ padding: '24px 32px', borderBottom: '1px solid #F1F5F9', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '20px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ padding: '8px', background: '#F0F9FF', borderRadius: '8px' }}>
+              <History size={18} color="#0284C7" />
+            </div>
+            <h3 style={{ fontSize: '16px', fontWeight: '800' }}>Execution Run History</h3>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', flex: '1', justifyContent: 'flex-end', minWidth: '300px' }}>
+            <div style={{ position: 'relative', maxWidth: '300px', width: '100%' }}>
+              <Search size={14} style={{ position: 'absolute', left: '12px', top: '14px', color: '#94A3B8' }} />
+              <input 
+                type="text" 
+                placeholder="Search runs..." 
+                className="form-control" 
+                value={filterText}
+                onChange={(e) => setFilterText(e.target.value)}
+                style={{ height: '40px', paddingLeft: '36px', fontSize: '13px' }} 
+              />
+            </div>
             <select 
               className="form-control" 
-              value={selectedProduct}
-              onChange={(e) => setSelectedProduct(e.target.value)}
-              style={{ height: '56px', borderRadius: '12px', fontSize: '15px' }}
-              disabled={isRunning}
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              style={{ height: '40px', width: '130px', fontSize: '13px' }}
             >
-              <option value="">-- Select Master --</option>
-              {masters.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
-              <option value="UPI Aggregator">UPI Aggregator</option>
-              <option value="Cash Back Daily">Cash Back Daily</option>
+              <option value="All">All Status</option>
+              <option value="Completed">Completed</option>
+              <option value="Failed">Failed</option>
             </select>
           </div>
-
-          <div style={{ flex: 1 }}>
-            {isFinished ? (
-              <div style={{ padding: '24px', background: '#ECFDF5', borderRadius: '20px', textAlign: 'center', border: '2px solid #D1FAE5' }} className="animate-fade-in">
-                <CheckCircle size={32} color="#10B981" style={{ margin: '0 auto 12px' }} />
-                <h4 style={{ color: '#064E3B', fontWeight: '900', fontSize: '16px', marginBottom: '4px' }}>BUILD SUCCESSFUL</h4>
-                <p style={{ color: '#065F46', fontSize: '12px' }}>Archived to global repository.</p>
-                <button 
-                  onClick={() => setIsFinished(false)}
-                  style={{ marginTop: '16px', background: '#059669', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '8px', cursor: 'pointer', fontWeight: '700', fontSize: '12px' }}
-                >
-                  Reset Console
-                </button>
-              </div>
-            ) : (
-              <div style={{ padding: '24px', background: '#F8FAFC', borderRadius: '18px', border: '1px solid #E2E8F0', marginBottom: '32px' }}>
-                <h4 style={{ fontSize: '13px', fontWeight: '900', color: '#1E293B', marginBottom: '16px' }}>System Pre-Check</h4>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: '#475569' }}>
-                    <CheckCircle2 size={14} color="#10B981" /> SFTP Gateway Online
-                  </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '12px', color: '#475569' }}>
-                    <CheckCircle2 size={14} color="#10B981" /> Forensic Vault Synced
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          {!isFinished && (
-            <button 
-              className="btn btn-primary" 
-              onClick={startEngine}
-              disabled={isRunning}
-              style={{ width: '100%', height: '52px', fontSize: '15px', fontWeight: '900', borderRadius: '12px' }}
-            >
-              {isRunning ? (
-                <><RefreshCw size={18} className="animate-spin" /> EXECUTING...</>
-              ) : (
-                <><Play size={18} fill="white" /> TRIGGER ENGINE</>
-              )}
-            </button>
-          )}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column' }}>
-          <div style={{ 
-            background: '#0F172A', 
-            borderRadius: '24px', 
-            padding: '32px', 
-            height: '540px', 
-            display: 'flex',
-            flexDirection: 'column',
-            border: '8px solid #1E293B',
-            boxShadow: '0 30px 60px -12px rgba(0, 0, 0, 0.6)'
-          }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '24px', borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: '18px' }}>
-              <div style={{ background: 'var(--gold)', padding: '8px', borderRadius: '8px' }}>
-                <Terminal size={18} color="#0F172A" />
-              </div>
-              <div>
-                <span style={{ color: 'white', fontSize: '12px', fontWeight: '900', letterSpacing: '2px', display: 'block' }}>RECON CONSOLE V4.0</span>
-              </div>
-              <div style={{ flex: 1 }}></div>
-              <div style={{ display: 'flex', gap: '8px' }}>
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#EF4444' }}></div>
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#F59E0B' }}></div>
-                <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10B981' }}></div>
-              </div>
-            </div>
-            
-            <div 
-              ref={terminalRef}
-              style={{ 
-                flex: 1, 
-                overflowY: 'auto', 
-                fontFamily: '"Fira Code", monospace', 
-                fontSize: '14px', 
-                color: '#E2E8F0', 
-                lineHeight: '2.2'
-              }}
-            >
-              {terminalLogs.map((log, i) => (
-                <div key={i} style={{ 
-                  color: log.includes('SUCCESS') ? '#10B981' : log.includes('ERROR') ? '#EF4444' : log.includes('Starting') ? 'var(--gold)' : '#CBD5E1',
-                  fontWeight: log.includes('SUCCESS') || log.includes('ERROR') ? '900' : '500'
-                }}>
-                  {log}
-                </div>
+        <div className="responsive-table-container" style={{ border: 'none', borderRadius: 0 }}>
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Batch ID</th>
+                <th>Recon Product</th>
+                <th>Trigger</th>
+                <th>Date</th>
+                <th>Matched</th>
+                <th>Exceptions</th>
+                <th>Status</th>
+                <th style={{ textAlign: 'right' }}>Analysis</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredHistory.map(run => (
+                <tr key={run.id}>
+                  <td style={{ fontSize: '12px', color: '#64748B', fontWeight: '700' }}>#{run.id}</td>
+                  <td><div style={{ fontWeight: '700' }}>{run.product}</div></td>
+                  <td>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600', color: '#475569' }}>
+                      {run.triggerType === 'Manual' ? <Clock size={12} /> : <ArrowRight size={12} color="var(--primary)" />}
+                      {run.triggerType}
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '13px', fontWeight: '600' }}>{run.date}</span>
+                      <span style={{ fontSize: '11px', color: '#94A3B8' }}>{run.time}</span>
+                    </div>
+                  </td>
+                  <td><span style={{ fontWeight: '800', color: '#10B981' }}>{run.matched}</span></td>
+                  <td><span style={{ fontWeight: '800', color: run.exceptions > 0 ? '#DC2626' : '#64748B' }}>{run.exceptions}</span></td>
+                  <td><span className={`status-pill ${run.status === 'Completed' ? 'status-success' : 'status-danger'}`}>{run.status}</span></td>
+                  <td style={{ textAlign: 'right' }}>
+                    <button className="btn btn-outline" style={{ height: '32px', padding: '0 12px', fontSize: '11px' }}>View Trace</button>
+                  </td>
+                </tr>
               ))}
-              {isRunning && <div className="animate-pulse" style={{ display: 'inline-block', width: '10px', height: '18px', background: 'var(--gold)', verticalAlign: 'middle', marginLeft: '6px' }}></div>}
-            </div>
-          </div>
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

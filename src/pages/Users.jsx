@@ -3,12 +3,12 @@ import { useApp } from '../context/AppContext';
 import { UserPlus, Search, Edit3, Trash2, X, Hash, Shield, CheckCircle, Save } from 'lucide-react';
 
 const Users = () => {
-  const { users, setUsers, addUser, updateUser, deleteUser, addNotification } = useApp();
+  const { users, roles, setUsers, addUser, updateUser, deleteUser, addNotification } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('All');
-  const [formData, setFormData] = useState({ name: '', employeeId: '', role: 'Ops_Maker', status: 'Active', password: '' });
+  const [formData, setFormData] = useState({ name: '', employeeId: '', role: '', status: 'Active', password: '' });
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
@@ -23,7 +23,7 @@ const Users = () => {
 
   const handleOpenAdd = () => {
     setEditingId(null);
-    setFormData({ name: '', employeeId: '', role: 'Ops_Maker', status: 'Active', password: '' });
+    setFormData({ name: '', employeeId: '', role: roles.length > 0 ? roles[0].name : 'Ops_Maker', status: 'Active', password: '' });
     setShowForm(true);
   };
 
@@ -93,10 +93,9 @@ const Users = () => {
           style={{ width: '200px', height: '52px' }}
         >
           <option value="All">All Roles</option>
-          <option value="Admin">Admin</option>
-          <option value="Ops_Maker">Ops Maker</option>
-          <option value="Ops_Checker">Ops Checker</option>
-          <option value="CS User">CS User</option>
+          {roles.map(r => (
+            <option key={r.id} value={r.name}>{r.name.replace('_', ' ')}</option>
+          ))}
         </select>
       </div>
 
@@ -119,10 +118,9 @@ const Users = () => {
               <div className="form-group">
                 <label className="form-label">Assigned Role</label>
                 <select className="form-control" value={formData.role} onChange={(e) => setFormData({...formData, role: e.target.value})}>
-                  <option value="Ops_Maker">Ops Maker</option>
-                  <option value="Ops_Checker">Ops Checker</option>
-                  <option value="Admin">Admin</option>
-                  <option value="CS User">CS User</option>
+                  {roles.map(r => (
+                    <option key={r.id} value={r.name}>{r.name.replace('_', ' ')}</option>
+                  ))}
                 </select>
               </div>
               {!editingId && (

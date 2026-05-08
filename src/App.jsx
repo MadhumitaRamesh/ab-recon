@@ -9,7 +9,6 @@ import AuditLog from './pages/AuditLog';
 import Roles from './pages/Roles';
 import Users from './pages/Users';
 import RunRecon from './pages/RunRecon';
-import RunHistory from './pages/RunHistory';
 import AiSuggestions from './pages/AiSuggestions';
 import Reports from './pages/Reports';
 import Sidebar from './components/Sidebar';
@@ -60,7 +59,6 @@ function App() {
       case 'dashboard': return <Dashboard />;
       case 'masters': return <ReconMaster />;
       case 'runs': return <RunRecon />;
-      case 'history': return <RunHistory />;
       case 'exceptions': return <ExceptionQueue />;
       case 'suggestions': return <AiSuggestions />;
       case 'reports': return <Reports />;
