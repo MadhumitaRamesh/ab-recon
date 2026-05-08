@@ -25,7 +25,10 @@ const ExceptionQueue = () => {
     addNotification, 
     masters, 
     fetchFilteredExceptions,
-    fetchSuggestions
+    fetchSuggestions,
+    exceptionFilters,
+    setExceptionFilters,
+    fetchAll
   } = useApp();
   
   const [selectedEx, setSelectedEx] = useState(null);
@@ -39,7 +42,24 @@ const ExceptionQueue = () => {
   const [filterPriority, setFilterPriority] = useState('All Priorities');
   const [filterStatus, setFilterStatus] = useState('All Statuses');
 
+  // When the global exceptionFilters context changes (e.g. user clicks "View Exceptions" from RunRecon),
+  // update local date filter to match and refresh exceptions with that runId filter.
   useEffect(() => {
+    if (exceptionFilters?.runId) {
+      // Reset all local filters and fetch for that specific runId
+      setFilterDate('');
+      setFilterProduct('All Products');
+      setFilterType('All Types');
+      setFilterPriority('All Priorities');
+      setFilterStatus('All Statuses');
+      fetchFilteredExceptions({ runId: exceptionFilters.runId });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [exceptionFilters?.runId]);
+
+  useEffect(() => {
+    // Only run the standard date-based filter if no runId cross-filter is active
+    if (exceptionFilters?.runId) return;
     fetchFilteredExceptions({
         date: filterDate,
         master: filterProduct,
@@ -47,7 +67,7 @@ const ExceptionQueue = () => {
         priority: filterPriority,
         status: filterStatus
     });
-  }, [filterDate, filterProduct, filterType, filterPriority, filterStatus]);
+  }, [filterDate, filterProduct, filterType, filterPriority, filterStatus, fetchFilteredExceptions]);
 
   useEffect(() => {
     const loadSuggestions = async () => {
@@ -63,8 +83,6 @@ const ExceptionQueue = () => {
     loadSuggestions();
   }, [selectedEx]);
   
-  const filteredExceptions = exceptions || [];
-
   const handleAcceptMatch = async (candidate) => {
     const success = await resolveException(selectedEx.id, candidate.id);
     if (success) {
@@ -73,6 +91,23 @@ const ExceptionQueue = () => {
     }
   };
 
+  const handleExport = () => {
+    addNotification({ title: 'Export Initiated', message: 'Generating forensic audit trail for the current filter set (XLSX)...' });
+    setTimeout(() => {
+      alert('Forensic_Audit_Trail_Filtered.xlsx has been downloaded.');
+    }, 1500);
+  };
+
+  const clearFilters = () => {
+    setFilterDate('');
+    setFilterProduct('All Products');
+    setFilterType('All Types');
+    setFilterPriority('All Priorities');
+    setFilterStatus('All Statuses');
+  };
+
+  const filteredExceptions = exceptions || [];
+
   return (
     <div className="main-content">
       <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -80,7 +115,7 @@ const ExceptionQueue = () => {
           <h1 style={{ fontSize: '28px', color: '#0F172A', fontWeight: '800' }}>Exception Intelligence</h1>
           <p style={{ color: '#64748B', fontSize: '15px', marginTop: '4px' }}>Forensic queue driven by dynamic reconciliation engine.</p>
         </div>
-        <button className="btn btn-outline" style={{ background: 'white' }}>
+        <button className="btn btn-outline" onClick={handleExport} style={{ background: 'white' }}>
           <Download size={16} style={{ marginRight: '8px' }} />
           Export Audit Trail
         </button>
@@ -104,8 +139,9 @@ const ExceptionQueue = () => {
             <select className="form-control" value={filterType} onChange={(e) => setFilterType(e.target.value)} style={{ height: '40px', fontSize: '13px' }}>
               <option value="All Types">All Types</option>
               <option value="Amount Mismatch">Amount Mismatch</option>
-              <option value="Duplicate Reference">Duplicate Reference</option>
               <option value="Missing Entry">Missing Entry</option>
+              <option value="Duplicate">Duplicate</option>
+              <option value="Late Settlement">Late Settlement</option>
             </select>
           </div>
           <div style={{ flex: '1', minWidth: '130px' }}>
@@ -126,14 +162,18 @@ const ExceptionQueue = () => {
             </select>
           </div>
           <button 
-            onClick={() => {
-              setFilterDate(new Date().toISOString().split('T')[0]);
-              setFilterProduct('All Products');
-              setFilterType('All Types');
-              setFilterPriority('All Priorities');
-              setFilterStatus('All Statuses');
+            onClick={async () => {
+              try {
+                await fetchAll();
+                addNotification({ title: 'Queue Updated', message: 'Exception intelligence refreshed.' });
+              } catch (e) {
+                addNotification({ title: 'Sync Error', message: e.message, type: 'danger' });
+              }
             }}
-            className="btn btn-outline" style={{ height: '40px', padding: '0 15px' }}><RefreshCw size={16} /></button>
+            className="btn btn-outline" style={{ height: '40px', padding: '0 15px', position: 'relative', zIndex: 10, cursor: 'pointer' }}><RefreshCw size={16} /></button>
+          <button 
+            onClick={clearFilters}
+            className="btn btn-outline" style={{ height: '40px', padding: '0 15px', color: '#64748B' }}>Clear</button>
         </div>
       </div>
 
@@ -204,6 +244,26 @@ const ExceptionQueue = () => {
               ) : (
                 <div style={{ textAlign: 'center', padding: '24px', color: '#94A3B8', fontSize: '13px' }}>No direct candidates found.</div>
               )}
+            </div>
+
+            <div style={{ marginTop: 'auto', paddingTop: '32px', borderTop: '1px solid #F1F5F9', display: 'flex', gap: '12px' }}>
+              <button 
+                onClick={() => resolveException(selectedEx.id)}
+                className="btn btn-primary" 
+                style={{ flex: 1, height: '44px', fontSize: '12px', background: '#10B981', borderColor: '#10B981' }}
+              >
+                Approve & Close
+              </button>
+              <button 
+                onClick={() => {
+                  addNotification({ title: 'Exception Flagged', message: `Transaction ${selectedEx.id} sent for senior review.`, type: 'warning' });
+                  setSelectedEx(null);
+                }}
+                className="btn btn-outline" 
+                style={{ flex: 1, height: '44px', fontSize: '12px', color: '#EF4444', borderColor: '#EF4444' }}
+              >
+                Flag Error
+              </button>
             </div>
           </div>
         )}

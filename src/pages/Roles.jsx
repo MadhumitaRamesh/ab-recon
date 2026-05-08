@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Shield, Plus, Edit3, Trash2, CheckCircle, X, Save, ShieldAlert } from 'lucide-react';
 
 const Roles = () => {
-  const { roles, setRoles, addRole, deleteRole, addNotification } = useApp();
+  const { roles, setRoles, addRole, updateRole, deleteRole, addNotification } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -27,18 +27,24 @@ const Roles = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (editingId) {
-      const success = await updateRole(editingId, formData);
-      if (success) {
-        addNotification({ title: 'Role Updated', message: `The '${formData.name}' role definition has been modified.` });
+    try {
+      if (editingId) {
+        const success = await updateRole(editingId, formData);
+        if (success) {
+          addNotification({ title: 'Role Updated', message: `The '${formData.name}' role definition has been modified.` });
+        } else {
+          addNotification({ title: 'System Error', message: 'Failed to save role changes. Please check permissions.', type: 'danger' });
+        }
+      } else {
+        const success = await addRole(formData);
+        if (success) {
+          addNotification({ title: 'Role Created', message: `New role '${formData.name}' successfully added.` });
+        }
       }
-    } else {
-      const success = await addRole(formData);
-      if (success) {
-        addNotification({ title: 'Role Created', message: `New role '${formData.name}' successfully added to the RBAC matrix.` });
-      }
+      setShowForm(false);
+    } catch (err) {
+      addNotification({ title: 'Critical Error', message: err.message, type: 'danger' });
     }
-    setShowForm(false);
   };
 
   const handleDelete = async (id, name) => {

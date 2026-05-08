@@ -28,10 +28,15 @@ const RunRecon = () => {
     user, 
     triggerReconRun, 
     setActivePage, 
-    setExceptionFilters 
+    setExceptionFilters,
+    fetchAll
   } = useApp();
   const [selectedMasterId, setSelectedMasterId] = useState('');
-  const [runDate, setRunDate] = useState(new Date().toISOString().split('T')[0]);
+  const getLocalDate = () => {
+    const d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+  };
+  const [runDate, setRunDate] = useState(getLocalDate());
   const [isRunning, setIsRunning] = useState(false);
   const [isFinished, setIsFinished] = useState(false);
   const [terminalLogs, setTerminalLogs] = useState(['> System Standby. Waiting for execution trigger...']);
@@ -41,7 +46,7 @@ const RunRecon = () => {
   const finishTriggered = useRef(false);
 
   // Filter states for history
-  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [filterDate, setFilterDate] = useState(getLocalDate());
   const [filterProduct, setFilterProduct] = useState('All Products');
   const [filterStatus, setFilterStatus] = useState('All Statuses');
   const [filterTrigger, setFilterTrigger] = useState('All Types');
@@ -107,12 +112,31 @@ const RunRecon = () => {
   }, [isRunning, stepIndex, selectedMaster]);
 
   const finalizeRun = async () => {
+    console.log('[DEBUG] Finalizing run for date:', runDate);
     try {
       const result = await triggerReconRun(selectedMaster.id, runDate, selectedMaster.run_mode || 'Manual');
-      addNotification({ title: 'Recon Success', message: `${selectedMaster?.name} cycle completed. ${result.exceptionCount} exceptions logged.` });
+      console.log('[DEBUG] Run result:', result);
+      
+      // Sync the history filter date to the run date so the new entry is immediately visible
+      setFilterDate(runDate);
+      setFilterProduct('All Products');
+      setFilterStatus('All Statuses');
+      setFilterTrigger('All Types');
+      
+      // Also explicitly refresh with matching filters
+      await fetchFilteredHistory({ date: runDate });
+      
+      addNotification({ 
+        title: 'Recon Success', 
+        message: `${selectedMaster?.name} cycle [${result.runId}] completed. ${result.exceptionCount} exception(s) logged.` 
+      });
     } catch (e) {
+      console.error('[DEBUG] Execution update failed', e);
       addNotification({ title: 'Recon Failed', message: `Execution error: ${e.message}`, type: 'error' });
-      console.error('Execution update failed', e);
+      
+      // On failure, still refresh so any partial data (failed run record) shows
+      setFilterDate(runDate);
+      await fetchFilteredHistory({ date: runDate });
     }
     
     setIsRunning(false);
@@ -129,7 +153,7 @@ const RunRecon = () => {
   };
 
   const handleViewExceptions = (runId) => {
-    setExceptionFilters({ runId, masterId: '' });
+    setExceptionFilters({ runId });
     setActivePage('exceptions');
   };
 
@@ -367,14 +391,16 @@ const RunRecon = () => {
             </div>
             <div style={{ flex: '0.5' }}>
               <button 
-                onClick={() => {
-                  setFilterDate(new Date().toISOString().split('T')[0]);
-                  setFilterProduct('All Products');
-                  setFilterStatus('All Statuses');
-                  setFilterTrigger('All Types');
+                onClick={async () => {
+                  try {
+                    await fetchAll();
+                    addNotification({ title: 'System Sync', message: 'Execution Logs Refreshed Successfully.' });
+                  } catch (e) {
+                    addNotification({ title: 'Sync Error', message: e.message, type: 'danger' });
+                  }
                 }}
                 className="btn btn-outline" 
-                style={{ height: '40px', width: '100%', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ height: '40px', width: '100%', padding: '0', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', zIndex: 10, cursor: 'pointer' }}
               >
                 <RefreshCw size={16} />
               </button>

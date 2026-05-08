@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Clock, User, Filter, Download, ShieldCheck, ChevronDown, CheckCircle, Hash, Server } from 'lucide-react';
 
 const AuditLog = () => {
-  const { auditLogs, addNotification } = useApp();
+  const { auditLogs, addNotification, resetSystemData } = useApp();
   const [filterType, setFilterType] = useState('All');
   const [showFilters, setShowFilters] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -19,6 +19,34 @@ const AuditLog = () => {
   const handleExport = () => {
     addNotification({ title: 'Exporting Audit Log', message: 'Generating immutable log report (CSV)...' });
     setTimeout(() => alert('ABC_System_Audit_Log_May_2026.csv downloaded.'), 1000);
+  };
+
+  const handleSystemReset = async () => {
+    const confirmed = window.confirm(
+      "CRITICAL ACTION: This will PERMANENTLY DELETE all reconciliation history, exceptions, and audit logs. \n\n" +
+      "✅ PRESERVED: Users, Roles, Permissions.\n" +
+      "🗑️ DELETED: History, Exceptions, Logs, AI Insights.\n\n" +
+      "Are you sure you want to proceed with the System Purge & Re-Seed?"
+    );
+
+    if (confirmed) {
+      addNotification({ title: 'System Reset', message: 'Purging operational data...' });
+      try {
+        const result = await resetSystemData();
+        if (result.success) {
+          const report = result.report;
+          const summary = `System Reset Completed!\n\n` +
+            `DELETED:\n- Exceptions: ${report.deleted.exceptions}\n- Run History: ${report.deleted.run_history}\n- Audit Logs: ${report.deleted.audit_logs}\n\n` +
+            `PRESERVED (Security Data):\n- Users: ${report.preserved.users}\n- Roles: ${report.preserved.roles}\n- Permissions: ${report.preserved.permissions}\n\n` +
+            `RE-SEEDED:\n- Masters: ${report.inserted.masters}`;
+          
+          alert(summary + "\n\nPress OK to finalize the re-seed and refresh the dashboard.");
+          window.location.reload(); // Hard reload to ensure zero-stale state
+        }
+      } catch (err) {
+        addNotification({ title: 'Reset Failed', message: err.message, type: 'danger' });
+      }
+    }
   };
 
   const getTypeStyle = (type) => {
@@ -43,6 +71,9 @@ const AuditLog = () => {
             <Server size={18} color="var(--primary)" />
             <div style={{ fontSize: '14px', color: '#1E293B', fontWeight: '700' }}>Cron Scheduler: <span style={{ color: '#059669' }}>Operational</span></div>
           </div>
+          <button className="btn btn-outline" onClick={handleSystemReset} style={{ height: '52px', borderColor: '#EF4444', color: '#EF4444' }}>
+            Purge & Re-Seed
+          </button>
           <button className="btn btn-primary" onClick={handleExport} style={{ height: '52px' }}>
             <Download size={18} style={{ marginRight: '10px' }} /> Export Security Log
           </button>
