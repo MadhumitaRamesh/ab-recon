@@ -71,6 +71,8 @@ export const AppProvider = ({ children }) => {
     matched: r.matched_count,
     exceptions: r.exception_count,
     time: r.run_time ? r.run_time.substring(0, 5) : '--',
+    startTime: r.start_time ? r.start_time.substring(0, 5) : '--',
+    endTime: r.end_time ? r.end_time.substring(0, 5) : '--',
     date: r.run_date ? new Date(r.run_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '--',
     rawDate: r.run_date,
     rawTime: r.run_time
@@ -332,7 +334,9 @@ export const AppProvider = ({ children }) => {
           matched_count: newRun.matched,
           exception_count: newRun.exceptions,
           run_date: newRun.rawDate,
-          run_time: newRun.rawTime
+          run_time: newRun.rawTime,
+          start_time: newRun.startTime,
+          end_time: newRun.endTime
         })
       });
       if (res.ok) {

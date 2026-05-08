@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Plus, Database, Settings2, FileCode, Edit3, Trash2, X, Info, Layers, Zap } from 'lucide-react';
+import { Plus, Database, Settings2, FileCode, Edit3, Trash2, X, Info, Layers, Zap, Globe, Server, UserCheck } from 'lucide-react';
 
 const ReconMaster = () => {
-  const { masters, setMasters, addMaster, updateMaster, deleteMaster, addNotification } = useApp();
+  const { masters, addMaster, updateMaster, deleteMaster, addNotification } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingMaster, setEditingMaster] = useState(null);
   
@@ -13,8 +13,8 @@ const ReconMaster = () => {
     matching_logic: '2-way',
     run_mode: 'Manual',
     source_config: [
-      { id: 'A', name: 'Source A', type: 'Manual Upload' },
-      { id: 'B', name: 'Source B', type: 'Manual Upload' }
+      { id: 'A', name: 'Source A', type: 'Manual Upload', tableName: '', apiUrl: '', apiKey: '' },
+      { id: 'B', name: 'Source B', type: 'Manual Upload', tableName: '', apiUrl: '', apiKey: '' }
     ],
     status: 'Active'
   };
@@ -27,17 +27,17 @@ const ReconMaster = () => {
     let newConfig = [];
 
     for (let i = 0; i < count; i++) {
-      const char = String.fromCharCode(65 + i); // A, B, C, D
+      const char = String.fromCharCode(65 + i);
       const existing = currentConfig.find(c => c.id === char);
-      newConfig.push(existing || { id: char, name: `Source ${char}`, type: 'Manual Upload' });
+      newConfig.push(existing || { id: char, name: `Source ${char}`, type: 'Manual Upload', tableName: '', apiUrl: '', apiKey: '' });
     }
 
     setFormData({ ...formData, matching_logic: logic, source_config: newConfig });
   };
 
-  const updateSourceType = (id, type) => {
+  const updateSourceField = (id, field, value) => {
     const newConfig = formData.source_config.map(c => 
-      c.id === id ? { ...c, type } : c
+      c.id === id ? { ...c, [field]: value } : c
     );
     setFormData({ ...formData, source_config: newConfig });
   };
@@ -76,7 +76,7 @@ const ReconMaster = () => {
         </div>
         {!showForm && (
           <button className="btn btn-primary" onClick={() => setShowForm(true)} style={{ width: 'auto', minWidth: '180px', height: '48px' }}>
-            <Plus size={18} style={{ marginRight: '8px' }} /> Create New Master
+            <Plus size={16} style={{ marginRight: '8px' }} /> Create New Master
           </button>
         )}
       </div>
@@ -128,45 +128,94 @@ const ReconMaster = () => {
               <h4 style={{ fontSize: '14px', color: '#1E293B', fontWeight: '800', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                 <Layers size={16} color="var(--primary)" /> Per-Source Data Configuration
               </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
                 {formData.source_config.map((source) => (
-                  <div key={source.id} style={{ padding: '20px', background: '#F8FAFC', borderRadius: '12px', border: '1px solid #E2E8F0' }}>
-                    <div style={{ fontWeight: '800', fontSize: '12px', color: 'var(--primary)', marginBottom: '12px' }}>SOURCE {source.id}</div>
+                  <div key={source.id} style={{ padding: '24px', background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', transition: 'all 0.3s ease' }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                      <div style={{ fontWeight: '900', fontSize: '12px', color: 'var(--primary)', letterSpacing: '1px' }}>SOURCE {source.id}</div>
+                      <div style={{ padding: '6px', background: 'white', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
+                        {source.type === 'Manual Upload' ? <UserCheck size={14} color="#64748B" /> : source.type === 'Automatic' ? <Server size={14} color="#D97706" /> : <Globe size={14} color="#0284C7" />}
+                      </div>
+                    </div>
+                    
                     <div className="form-group">
-                      <label style={{ fontSize: '12px', color: '#64748B', display: 'block', marginBottom: '6px' }}>Source Label</label>
+                      <label style={{ fontSize: '12px', color: '#64748B', fontWeight: '700', marginBottom: '8px', display: 'block' }}>Source Label</label>
                       <input 
                         type="text" 
                         className="form-control" 
                         value={source.name} 
-                        onChange={(e) => {
-                          const newConfig = formData.source_config.map(c => c.id === source.id ? { ...c, name: e.target.value } : c);
-                          setFormData({ ...formData, source_config: newConfig });
-                        }}
+                        onChange={(e) => updateSourceField(source.id, 'name', e.target.value)}
+                        placeholder={`e.g. ${source.id === 'A' ? 'Internal Ledger' : 'Bank Statement'}`}
                       />
                     </div>
-                    <div className="form-group" style={{ marginBottom: 0 }}>
-                      <label style={{ fontSize: '12px', color: '#64748B', display: 'block', marginBottom: '6px' }}>Ingestion Type</label>
+                    
+                    <div className="form-group">
+                      <label style={{ fontSize: '12px', color: '#64748B', fontWeight: '700', marginBottom: '8px', display: 'block' }}>Ingestion Type</label>
                       <select 
                         className="form-control" 
                         value={source.type} 
-                        onChange={(e) => updateSourceType(source.id, e.target.value)}
+                        onChange={(e) => updateSourceField(source.id, 'type', e.target.value)}
                       >
                         <option>Manual Upload</option>
-                        <option>Direct Database</option>
-                        <option>SFTP Pull</option>
-                        <option>API Fetch</option>
+                        <option>Automatic</option>
+                        <option>API-Based</option>
                       </select>
                     </div>
+
+                    {/* Conditional Fields */}
+                    {source.type === 'Automatic' && (
+                      <div className="form-group animate-reveal">
+                        <label style={{ fontSize: '12px', color: '#D97706', fontWeight: '800', marginBottom: '8px', display: 'block' }}>Internal Dataset / Table Name</label>
+                        <input 
+                          type="text" 
+                          className="form-control" 
+                          value={source.tableName || ''} 
+                          onChange={(e) => updateSourceField(source.id, 'tableName', e.target.value)}
+                          placeholder="e.g. gl_transactions"
+                          style={{ borderColor: '#FDE68A', background: '#FFFBEB' }}
+                          required
+                        />
+                      </div>
+                    )}
+
+                    {source.type === 'API-Based' && (
+                      <div className="animate-reveal">
+                        <div className="form-group">
+                          <label style={{ fontSize: '12px', color: '#0284C7', fontWeight: '800', marginBottom: '8px', display: 'block' }}>API Endpoint URL</label>
+                          <input 
+                            type="text" 
+                            className="form-control" 
+                            value={source.apiUrl || ''} 
+                            onChange={(e) => updateSourceField(source.id, 'apiUrl', e.target.value)}
+                            placeholder="e.g. https://api.example.com/transactions"
+                            style={{ borderColor: '#BAE6FD', background: '#F0F9FF' }}
+                            required
+                          />
+                        </div>
+                        <div className="form-group">
+                          <label style={{ fontSize: '12px', color: '#0284C7', fontWeight: '800', marginBottom: '8px', display: 'block' }}>API Key / Auth Token</label>
+                          <input 
+                            type="password" 
+                            className="form-control" 
+                            value={source.apiKey || ''} 
+                            onChange={(e) => updateSourceField(source.id, 'apiKey', e.target.value)}
+                            placeholder="Enter API key"
+                            style={{ borderColor: '#BAE6FD', background: '#F0F9FF' }}
+                            required
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             </div>
 
             <div style={{ display: 'flex', gap: '16px', borderTop: '1px solid #F1F5F9', paddingTop: '24px' }}>
-              <button type="submit" className="btn btn-primary" style={{ flex: '1', height: '48px' }}>
+              <button type="submit" className="btn btn-primary" style={{ flex: '1', height: '52px', fontWeight: '800' }}>
                 {editingMaster ? 'Synchronize Updates' : 'Confirm Configuration'}
               </button>
-              <button type="button" className="btn btn-outline" style={{ flex: '1', height: '48px' }} onClick={() => setShowForm(false)}>Discard</button>
+              <button type="button" className="btn btn-outline" style={{ flex: '1', height: '52px' }} onClick={() => setShowForm(false)}>Discard</button>
             </div>
           </form>
         </div>

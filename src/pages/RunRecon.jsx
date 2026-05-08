@@ -13,7 +13,10 @@ import {
   Clock,
   Activity,
   History,
-  ArrowRight
+  ArrowRight,
+  AlertCircle,
+  Link,
+  Table as TableIcon
 } from 'lucide-react';
 
 const RunRecon = () => {
@@ -24,6 +27,7 @@ const RunRecon = () => {
   const [isFinished, setIsFinished] = useState(false);
   const [terminalLogs, setTerminalLogs] = useState(['> System Standby. Waiting for execution trigger...']);
   const [stepIndex, setStepIndex] = useState(-1);
+  const [fileSelections, setFileSelections] = useState({}); // { sourceId: fileName }
   const terminalRef = useRef(null);
   const finishTriggered = useRef(false);
 
@@ -38,6 +42,15 @@ const RunRecon = () => {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
     }
   }, [terminalLogs]);
+
+  // Reset file selections when master changes
+  useEffect(() => {
+    setFileSelections({});
+  }, [selectedMasterId]);
+
+  const manualSources = selectedMaster?.source_config?.filter(s => s.type === 'Manual Upload') || [];
+  const missingFiles = manualSources.filter(s => !fileSelections[s.id]);
+  const canExecute = selectedMaster && missingFiles.length === 0;
 
   const sequence = [
     { msg: '> Validating secure handshake with ingestion gateway...', delay: 500 },
@@ -73,6 +86,9 @@ const RunRecon = () => {
   const finalizeRun = async () => {
     const runId = `RUN-${Math.floor(Math.random() * 900) + 100}`;
     const now = new Date();
+    const startTime = new Date(now.getTime() - 45000).toLocaleTimeString('en-GB', { hour12: false });
+    const endTime = now.toLocaleTimeString('en-GB', { hour12: false });
+    
     const newRun = { 
       id: runId, 
       product: selectedMaster?.name || 'Master', 
@@ -80,11 +96,13 @@ const RunRecon = () => {
       triggerType: selectedMaster?.run_mode || 'Manual',
       matched: '4,218', 
       exceptions: Math.floor(Math.random() * 5).toString(), 
-      rawTime: now.toLocaleTimeString('en-GB', { hour12: false }),
+      rawTime: endTime,
+      startTime: startTime,
+      endTime: endTime,
       rawDate: runDate
     };
     
-    await setRunHistory(newRun); // This now handles persistence in AppContext
+    await setRunHistory(newRun);
     addNotification({ title: 'Recon Success', message: `${selectedMaster?.name} cycle completed.` });
     logAudit('Manual Run Success', 'Engine', `Cycle ${runId} for ${selectedMaster?.name} verified.`, 'Operations');
     
@@ -93,7 +111,7 @@ const RunRecon = () => {
   };
 
   const startEngine = () => {
-    if (!selectedMaster) return;
+    if (!canExecute) return;
     finishTriggered.current = false;
     setIsFinished(false);
     setStepIndex(-1);
@@ -106,6 +124,10 @@ const RunRecon = () => {
     const matchesStatus = statusFilter === 'All' || r.status === statusFilter;
     return matchesSearch && matchesStatus;
   });
+
+  const handleFileChange = (sourceId, fileName) => {
+    setFileSelections(prev => ({ ...prev, [sourceId]: fileName }));
+  };
 
   return (
     <div className="main-content">
@@ -126,7 +148,7 @@ const RunRecon = () => {
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '24px' }}>
             <div className="form-group">
-              <label className="form-label" style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748B' }}>Product Master</label>
+              <label className="form-label" style={{ fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: '#64748B' }}>Product Master</label>
               <select 
                 className="form-control" 
                 value={selectedMasterId} 
@@ -138,7 +160,7 @@ const RunRecon = () => {
               </select>
             </div>
             <div className="form-group">
-              <label className="form-label" style={{ fontSize: '12px', textTransform: 'uppercase', color: '#64748B' }}>Run Date</label>
+              <label className="form-label" style={{ fontSize: '11px', fontWeight: '900', textTransform: 'uppercase', color: '#64748B' }}>Run Date</label>
               <input 
                 type="date" 
                 className="form-control" 
@@ -152,44 +174,71 @@ const RunRecon = () => {
           {selectedMaster && (
             <div className="animate-reveal" style={{ flex: 1, padding: '24px', background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', marginBottom: '32px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px' }}>
-                <span style={{ fontSize: '12px', fontWeight: '800', color: 'var(--primary)' }}>INGESTION REQUIREMENTS</span>
+                <span style={{ fontSize: '12px', fontWeight: '900', color: 'var(--primary)' }}>INGESTION MATRIX</span>
                 <span style={{ fontSize: '11px', fontWeight: '700', background: '#E2E8F0', padding: '2px 8px', borderRadius: '4px' }}>{selectedMaster.run_mode.toUpperCase()}</span>
               </div>
               
-              {selectedMaster.run_mode === 'Manual' ? (
-                <div style={{ display: 'grid', gap: '12px' }}>
-                  {selectedMaster.source_config.map(source => (
-                    <div key={source.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', background: 'white', borderRadius: '10px', border: '1px solid #F1F5F9' }}>
-                      <div>
-                        <div style={{ fontSize: '13px', fontWeight: '700' }}>{source.name}</div>
-                        <div style={{ fontSize: '11px', color: '#94A3B8' }}>{source.type}</div>
+              <div style={{ display: 'grid', gap: '12px' }}>
+                {selectedMaster.source_config.map(source => (
+                  <div key={source.id}>
+                    {source.type === 'Manual Upload' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'white', borderRadius: '12px', border: fileSelections[source.id] ? '1px solid #10B981' : '1px solid #E2E8F0' }}>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: '800' }}>Upload File — {source.name}</div>
+                          <div style={{ fontSize: '11px', color: fileSelections[source.id] ? '#10B981' : '#94A3B8', fontWeight: '600' }}>
+                            {fileSelections[source.id] ? `✓ ${fileSelections[source.id]}` : 'CSV/XLSX required'}
+                          </div>
+                        </div>
+                        <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', fontSize: '12px', fontWeight: '800', padding: '8px 12px', background: 'var(--primary-light)', borderRadius: '8px' }}>
+                          <FileUp size={16} /> Choose
+                          <input 
+                            type="file" 
+                            style={{ display: 'none' }} 
+                            disabled={isRunning} 
+                            onChange={(e) => handleFileChange(source.id, e.target.files[0]?.name)}
+                          />
+                        </label>
                       </div>
-                      <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', fontSize: '12px', fontWeight: '700' }}>
-                        <FileUp size={16} /> Upload CSV
-                        <input type="file" style={{ display: 'none' }} disabled={isRunning} />
-                      </label>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div style={{ textAlign: 'center', padding: '20px' }}>
-                  <RefreshCw size={24} color="#94A3B8" className={isRunning ? 'animate-spin' : ''} style={{ marginBottom: '12px' }} />
-                  <p style={{ fontSize: '13px', color: '#64748B' }}>This master is configured for <strong>{selectedMaster.run_mode}</strong>. Ingestion will be triggered automatically upon execution.</p>
-                </div>
-              )}
+                    ) : source.type === 'Automatic' ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: '#FFFBEB', borderRadius: '12px', border: '1px solid #FDE68A' }}>
+                        <TableIcon size={20} color="#D97706" />
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: '800', color: '#92400E' }}>Source {source.id}: Automatic Ingestion</div>
+                          <div style={{ fontSize: '11px', color: '#B45309' }}>Fetching from internal dataset: <strong>{source.tableName}</strong></div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: '#F0F9FF', borderRadius: '12px', border: '1px solid #BAE6FD' }}>
+                        <Globe size={20} color="#0284C7" />
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: '800', color: '#075985' }}>Source {source.id}: API Bridge</div>
+                          <div style={{ fontSize: '11px', color: '#0369A1' }}>Fetch via Endpoint: <strong>{source.apiUrl}</strong></div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {!canExecute && selectedMaster && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#DC2626', background: '#FEF2F2', padding: '12px 16px', borderRadius: '10px', marginBottom: '20px', fontSize: '12px', fontWeight: '700' }}>
+              <AlertCircle size={16} />
+              Missing data source: {missingFiles.map(s => s.name).join(', ')}
             </div>
           )}
 
           <button 
             className="btn btn-primary" 
             onClick={startEngine} 
-            disabled={!selectedMaster || isRunning}
-            style={{ width: '100%', height: '54px', fontSize: '15px', fontWeight: '800', borderRadius: '12px' }}
+            disabled={!canExecute || isRunning}
+            style={{ width: '100%', height: '54px', fontSize: '15px', fontWeight: '900', borderRadius: '12px', boxShadow: canExecute && !isRunning ? '0 10px 15px -3px rgba(243, 112, 33, 0.3)' : 'none' }}
           >
             {isRunning ? (
-              <><RefreshCw size={18} className="animate-spin" /> RUNNING ENGINE...</>
+              <><RefreshCw size={18} className="animate-spin" /> EXECUTING...</>
             ) : (
-              <><Play size={18} fill="white" /> INITIALIZE RECONCILIATION</>
+              <><Play size={18} fill="white" /> TRIGGER ENGINE</>
             )}
           </button>
         </div>
@@ -282,11 +331,13 @@ const RunRecon = () => {
                 <th>Batch ID</th>
                 <th>Recon Product</th>
                 <th>Trigger</th>
-                <th>Date</th>
+                <th>Run Date</th>
+                <th>Status</th>
                 <th>Matched</th>
                 <th>Exceptions</th>
-                <th>Status</th>
-                <th style={{ textAlign: 'right' }}>Analysis</th>
+                <th>Start Time</th>
+                <th>End Time</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -295,22 +346,19 @@ const RunRecon = () => {
                   <td style={{ fontSize: '12px', color: '#64748B', fontWeight: '700' }}>#{run.id}</td>
                   <td><div style={{ fontWeight: '700' }}>{run.product}</div></td>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '600', color: '#475569' }}>
-                      {run.triggerType === 'Manual' ? <Clock size={12} /> : <ArrowRight size={12} color="var(--primary)" />}
-                      {run.triggerType}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: run.triggerType === 'Manual' ? '#64748B' : 'var(--primary)' }}>
+                      {run.triggerType === 'Manual' ? <Clock size={12} /> : <Zap size={12} />}
+                      {run.triggerType === 'Manual' ? 'Manual' : 'Scheduled'}
                     </div>
                   </td>
-                  <td>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '13px', fontWeight: '600' }}>{run.date}</span>
-                      <span style={{ fontSize: '11px', color: '#94A3B8' }}>{run.time}</span>
-                    </div>
-                  </td>
+                  <td><div style={{ fontSize: '13px', fontWeight: '600' }}>{run.date}</div></td>
+                  <td><span className={`status-pill ${run.status === 'Completed' ? 'status-success' : 'status-danger'}`}>{run.status}</span></td>
                   <td><span style={{ fontWeight: '800', color: '#10B981' }}>{run.matched}</span></td>
                   <td><span style={{ fontWeight: '800', color: run.exceptions > 0 ? '#DC2626' : '#64748B' }}>{run.exceptions}</span></td>
-                  <td><span className={`status-pill ${run.status === 'Completed' ? 'status-success' : 'status-danger'}`}>{run.status}</span></td>
+                  <td><div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B' }}>{run.startTime}</div></td>
+                  <td><div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B' }}>{run.endTime}</div></td>
                   <td style={{ textAlign: 'right' }}>
-                    <button className="btn btn-outline" style={{ height: '32px', padding: '0 12px', fontSize: '11px' }}>View Trace</button>
+                    <button className="btn btn-outline" style={{ height: '32px', padding: '0 12px', fontSize: '11px', fontWeight: '800' }}>View Details</button>
                   </td>
                 </tr>
               ))}
