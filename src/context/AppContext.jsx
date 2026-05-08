@@ -21,7 +21,7 @@ export const AppProvider = ({ children }) => {
   const [exceptionFilters, setExceptionFilters] = useState({ runId: '', masterId: '' });
 
   const modules = [
-    'Dashboard', 'Recon Masters', 'Run Recon', 'Run History', 'Exception Queue',
+    'Dashboard', 'Recon Masters', 'Run Recon', 'Exception Queue',
     'AI Suggestions', 'Reports', 'Audit Log', 'Users', 'Roles', 'Permissions'
   ];
 
@@ -39,10 +39,9 @@ export const AppProvider = ({ children }) => {
     perms['Dashboard']['BU_User'] = true;
     perms['Recon Masters']['Ops_Maker'] = true;
     perms['Run Recon']['Ops_Maker'] = true;
-    perms['Run History']['Ops_Maker'] = true;
-    perms['Run History']['Ops_Checker'] = true;
-    perms['Run History']['CS User'] = true;
-    perms['Run History']['BU_User'] = true;
+    perms['Run Recon']['Ops_Maker'] = true;
+    perms['Exception Queue']['Ops_Maker'] = true;
+    perms['Exception Queue']['Ops_Checker'] = true;
     perms['Exception Queue']['Ops_Maker'] = true;
     perms['Exception Queue']['Ops_Checker'] = true;
     perms['AI Suggestions']['Ops_Maker'] = true;
