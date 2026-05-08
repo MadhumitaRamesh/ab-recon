@@ -145,6 +145,21 @@ async function seed() {
         await connection.execute('INSERT INTO audit_logs (user_name, action, module, detail, log_time, log_date, type) VALUES (?, ?, ?, ?, ?, ?, ?)', d);
     }
 
+    // 8. Suggestions
+    console.log('Seeding Suggestions...');
+    await connection.execute('DELETE FROM suggestions');
+    const [exRows] = await connection.execute('SELECT id FROM exceptions');
+    for (const ex of exRows) {
+        const sugs = [
+            [ex.id, `CAND-${Math.floor(Math.random() * 900) + 100}`, 94, "Exact amount and reference match found in secondary source ledger."],
+            [ex.id, `CAND-${Math.floor(Math.random() * 900) + 100}`, 82, "High confidence pattern match based on historical behavior."],
+            [ex.id, `CAND-${Math.floor(Math.random() * 900) + 100}`, 75, "Partial match found with matching reference number but slight date variance."]
+        ];
+        for (const s of sugs) {
+            await connection.execute('INSERT INTO suggestions (exception_id, candidate_id, confidence, reason) VALUES (?, ?, ?, ?)', s);
+        }
+    }
+
     console.log('--- DEMO SEEDING COMPLETE ---');
     await connection.end();
 }

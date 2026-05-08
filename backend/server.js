@@ -160,11 +160,33 @@ app.get('/api/masters', (req, res) => {
 
 app.post('/api/masters', (req, res) => {
     const { name, frequency, matching_logic, run_mode, source_config, status } = req.body;
-    db.query('INSERT INTO masters (name, frequency, matching_logic, run_mode, source_config, status) VALUES (?, ?, ?, ?, ?, ?)',
-    [name, frequency, matching_logic, run_mode, JSON.stringify(source_config), status], (err, results) => {
-        if (err) return res.status(500).json({ error: err.message });
-        res.json({ id: results.insertId, ...req.body });
-    });
+
+    try {
+        // Fix 2: Validation
+        if (!name) return res.status(400).json({ error: 'Required field missing: name' });
+        if (!frequency) return res.status(400).json({ error: 'Required field missing: frequency' });
+        if (!matching_logic) return res.status(400).json({ error: 'Required field missing: matching_logic (type)' });
+        if (!run_mode) return res.status(400).json({ error: 'Required field missing: run_mode (ways)' });
+        if (!source_config || (Array.isArray(source_config) && source_config.length === 0)) {
+            return res.status(400).json({ error: 'Required field missing: at least one source configuration' });
+        }
+
+        // Fix 1: Duplicate check
+        db.query('SELECT id FROM masters WHERE name = ?', [name], (err, results) => {
+            if (err) return res.status(500).json({ error: err.message });
+            if (results.length > 0) {
+                return res.status(409).json({ error: 'A reconciliation master with this name already exists.' });
+            }
+
+            db.query('INSERT INTO masters (name, frequency, matching_logic, run_mode, source_config, status) VALUES (?, ?, ?, ?, ?, ?)',
+            [name, frequency, matching_logic, run_mode, JSON.stringify(source_config), status || 'Active'], (err, results) => {
+                if (err) return res.status(500).json({ error: err.message });
+                res.json({ id: results.insertId, ...req.body });
+            });
+        });
+    } catch (err) {
+        res.status(500).json({ error: `Unexpected error: ${err.message}` });
+    }
 });
 
 app.put('/api/masters/:id', (req, res) => {
@@ -203,24 +225,21 @@ app.get('/api/exceptions', (req, res) => {
 });
 
 app.get('/api/suggestions/:exceptionId', (req, res) => {
-    // Simulation of Intelligence Engine matching
-    // In a production app, this would query a vector DB or matching algorithm
     const { exceptionId } = req.params;
-    const suggestions = [
-        { 
-            id: `SUG-${Math.floor(Math.random() * 900) + 100}`, 
-            candidateId: `BK-${exceptionId.split('-').pop()}`, 
-            confidence: 94, 
-            reason: "Exact amount and reference match found in secondary source ledger." 
-        },
-        { 
-            id: `SUG-${Math.floor(Math.random() * 900) + 100}`, 
-            candidateId: `SYS-882`, 
-            confidence: 82, 
-            reason: "High confidence pattern match based on historical reconciliation behavior." 
+
+    // Fix 3: Check if exception exists
+    db.query('SELECT id FROM exceptions WHERE id = ?', [exceptionId], (err, exResults) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (exResults.length === 0) {
+            return res.status(404).json({ error: 'Forensic record not found for this exception ID.' });
         }
-    ];
-    res.json(suggestions);
+
+        // Fetch from suggestions table
+        db.query('SELECT candidate_id as candidateId, confidence, reason FROM suggestions WHERE exception_id = ?', [exceptionId], (err, sugResults) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json(sugResults || []);
+        });
+    });
 });
 
 app.post('/api/exceptions/bulk', (req, res) => {
