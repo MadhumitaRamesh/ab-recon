@@ -1,0 +1,38 @@
+USE ab_recon_db;
+
+INSERT INTO suggestions (exception_id,candidate_id,confidence,reason) VALUES
+('EX-3001','CAND-CB-A001',88,'Exact amount match of ₹15,420.50 found in CB Settlements with 1-day timing difference on settlement_date 2026-04-15.'),
+('EX-3001','CAND-CB-A002',72,'Reference number CB-TXN-88291 partially matches batch CB-TXN-882XX in settlements with same product_type CashBack.'),
+('EX-3002','CAND-CB-B001',81,'Missing entry CB-TXN-88305 found in cb_settlements under alternate ref CB-SET-88305 with amount ₹3,200.00.'),
+('EX-3002','CAND-CB-B002',65,'Same amount ₹3,200.00 exists in settlement on 2026-04-16 with 1 day lag, possible T+1 posting.'),
+('EX-3003','CAND-BP-A001',91,'Exact amount ₹48,750.00 matched in BBPS ledger with reference BBPS-REF-22441, timing difference of 2 hours.'),
+('EX-3003','CAND-BP-A002',77,'Amount ₹48,750.00 found in bbps_ledger on 2026-04-16 under product Bill_Payment — possible date rollover.'),
+('EX-3005','CAND-UP-A001',85,'Duplicate UPI-TXN-55612 detected — identical amount ₹22,300.00 posted twice on same txn_date with different UTR numbers.'),
+('EX-3005','CAND-UP-A002',60,'Reference UPI-TXN-55612 appears in NPCI API response with status PENDING — possible retry duplication.'),
+('EX-3006','CAND-UP-B001',79,'Missing UPI entry found in NPCI API response as UTR-556340 with amount ₹9,100.00 and same product_type UPI_P2P.'),
+('EX-3006','CAND-UP-B002',58,'Amount ₹9,100.00 exists in upi_transactions on 2026-04-17 — possible next-day settlement posting.'),
+('EX-3008','CAND-CB-C001',93,'Amount ₹18,900.00 in cb_settlements on 2026-04-21 matches exactly — reference CB-SET-89001 maps to CB-TXN-89001.'),
+('EX-3008','CAND-CB-C002',69,'Same product_type Cashback, same amount ₹18,900.00, different reference — possible reference mismatch on gateway.'),
+('EX-3009','CAND-CB-D001',74,'Unclassified item ₹4,350.00 matches an unposted entry in cb_settlements dated 2026-04-22.'),
+('EX-3010','CAND-DG-A001',87,'Amount ₹31,200.00 in DigiGold API holdings matches Gold Vault record GV-10091 dated 2026-04-22.'),
+('EX-3010','CAND-DG-A002',61,'Reference DG-REF-10091 partially matches DG-SET-10091 in vault records — same amount, 1-day difference.'),
+('EX-3012','CAND-BP-B001',82,'Duplicate BBPS-REF-23101 — same ₹12,500.00 posted in bbps_ledger twice on 2026-04-23 and 2026-04-24.'),
+('EX-3013','CAND-BP-C001',90,'Missing BBPS-REF-23145 found in BBPS API response as TXN-23145-RETRY with amount ₹44,200.00.'),
+('EX-3013','CAND-BP-C002',71,'Amount ₹44,200.00 found in bbps_ledger on 2026-04-24 — possible 1-day settlement lag.'),
+('EX-3015','CAND-CB-E001',88,'Amount ₹27,600.00 in CB Settlements on 2026-04-25 exactly matches CB-TXN-89910 with reference CB-SET-89910.'),
+('EX-3015','CAND-CB-E002',66,'Same product Cashback, amount ₹27,600.00, minor reference mismatch — CB-TXN-89910 vs CB-89910 in gateway.'),
+('EX-3016','CAND-MF-A001',76,'MF-NAV-5501 timing difference — amount ₹3,100.00 posted in mf_settlements 1 day after nav_date 2026-04-28.'),
+('EX-3017','CAND-PP-A001',80,'PPI Wallet entry ₹19,800.00 found in wallet dump under reference PPI-WLT-8801-R with same product code.'),
+('EX-3017','CAND-PP-A002',55,'Amount ₹19,800.00 found in historical PPI records for same wallet ID — possible duplicate submission.'),
+('EX-3019','CAND-UP-C001',92,'Exact match — UPI-TXN-56901 amount ₹36,000.00 found in NPCI API as UTR-569010 with same txn_date 2026-05-02.'),
+('EX-3019','CAND-UP-C002',68,'Amount ₹36,000.00 also in upi_transactions on 2026-05-03 — possible T+1 settlement with same product_type.'),
+('EX-3020','CAND-UP-D001',83,'Duplicate detected — UPI-TXN-56934 posted twice in upi_transactions, amounts match ₹11,100.00, different timestamps.'),
+('EX-3021','CAND-DG-B001',78,'DigiGold DG-REF-10780 ₹2,800.00 found in Gold Vault Records as GV-10780 with 2-day timing lag.'),
+('EX-3022','CAND-MF-B001',89,'MF-NAV-5890 amount ₹49,100.00 matched in AMFI API response for same fund_type EQUITY on nav_date 2026-05-06.'),
+('EX-3022','CAND-MF-B002',63,'Same fund_type, amount ₹49,100.00 in mf_settlements on 2026-05-07 — 1-day post-settlement lag.'),
+('EX-3023','CAND-BP-D001',85,'BBPS reversal ₹8,400.00 found in BBPS API as REV-24501, linked to original BBPS-REF-24501.'),
+('EX-3024','CAND-CB-F001',73,'Timing difference — CB-TXN-91001 ₹17,300.00 found in cb_settlements with settlement_date 2026-05-10.'),
+('EX-3025','CAND-UP-E001',94,'Amount ₹23,450.00 in NPCI API as UTR-578001, exact reference match UPI-TXN-57800, same txn_date 2026-05-09.'),
+('EX-3025','CAND-UP-E002',57,'Amount ₹23,450.00 also in upi_transactions as duplicate entry with 3-minute timestamp difference.');
+
+SELECT COUNT(*) as suggestions_count FROM suggestions;
