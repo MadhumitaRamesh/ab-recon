@@ -42,7 +42,8 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
     try {
         // 1. Dynamic Data Retrieval based on Configuration
         for (const source of sources) {
-            if (source.type === 'Automatic' || source.type === 'DB-Table') {
+            const sourceType = (source.type || '').trim();
+            if (sourceType === 'Automatic' || sourceType === 'DB-Table') {
                 try {
                     const [rows] = await db.promise().query(`SELECT * FROM ?? LIMIT 100`, [source.tableName]);
                     if (!rows || rows.length === 0) {
@@ -59,13 +60,18 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
                     console.warn(`[ENGINE] Source table [${source.tableName}] not accessible: ${err.message}. Using synthetic data.`);
                     sourceData[source.id] = generateSyntheticData(source.id, masterConfig.name, sharedPool);
                 }
-            } else if (source.type === 'API-Based' || source.type === 'External API') {
+            } else if (sourceType === 'API-Based' || sourceType === 'External API') {
+                console.log(`[ENGINE] Source ${source.id} (${source.name}) is API-Based — using synthetic data.`);
                 sourceData[source.id] = generateSyntheticData(source.id, masterConfig.name, sharedPool);
-            } else if (source.type === 'Manual Upload') {
+            } else if (sourceType === 'Manual Upload') {
                 const provided = manualData[source.id];
                 sourceData[source.id] = (provided && provided.length > 0)
                     ? provided
                     : generateSyntheticData(source.id, masterConfig.name, sharedPool);
+            } else {
+                // Defensive fallback: unknown or missing type — use synthetic data so the run doesn't fail
+                console.warn(`[ENGINE] Source ${source.id} (${source.name}) has unrecognised type '${sourceType}'. Defaulting to synthetic data.`);
+                sourceData[source.id] = generateSyntheticData(source.id, masterConfig.name, sharedPool);
             }
         }
 
