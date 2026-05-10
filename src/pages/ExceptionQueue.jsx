@@ -14,7 +14,8 @@ const ExceptionQueue = () => {
   const { 
     exceptions, 
     resolveException, 
-    addNotification, 
+    addNotification,
+    logAudit,
     masters, 
     fetchFilteredExceptions,
     fetchSuggestions,
@@ -116,6 +117,12 @@ const ExceptionQueue = () => {
       const success = await resolveException(selectedEx.id);
       if (success) {
         addNotification({ title: 'Exception Approved & Closed', message: `Transaction ${selectedEx.id} has been resolved and removed from the queue.` });
+        await logAudit(
+          'Exception Approved',
+          'Exception Queue',
+          `Transaction ${selectedEx.id} | Ref: ${selectedEx.ref || selectedEx.uniqueRef || '—'} | Amount: ₹${selectedEx.amount} | Approved & closed by operator.`,
+          'Operations'
+        );
         setSelectedEx(null);
       } else {
         addNotification({ title: 'Action Failed', message: 'Could not approve exception. Please try again.' });
@@ -132,6 +139,12 @@ const ExceptionQueue = () => {
     setIsActioning(true);
     try {
       addNotification({ title: 'Exception Flagged', message: `Transaction ${selectedEx.id} has been escalated for senior review.` });
+      await logAudit(
+        'Exception Escalated',
+        'Exception Queue',
+        `Transaction ${selectedEx.id} | Ref: ${selectedEx.ref || selectedEx.uniqueRef || '—'} | Amount: ₹${selectedEx.amount} | Flagged as error and sent for senior review.`,
+        'Security'
+      );
       setSelectedEx(null);
     } finally {
       setIsActioning(false);
