@@ -21,18 +21,56 @@ const getLocalDate = () => {
 };
 
 const Dashboard = () => {
-  const { setActivePage, addNotification, fetchFilteredHistory, runHistory, exceptions } = useApp();
+  const { setActivePage, addNotification, fetchFilteredHistory, runHistory, exceptions, masters } = useApp();
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(getLocalDate());
 
-  // Filter run history by selected date
-  const dailyRuns = useMemo(() => {
-    return (Array.isArray(runHistory) ? runHistory : []).filter(
-      run => run && run.rawDate === selectedDate
-    );
-  }, [runHistory, selectedDate]);
+  const allRuns = Array.isArray(runHistory) ? runHistory : [];
+  const allExceptions = Array.isArray(exceptions) ? exceptions : [];
 
-  // Consolidated summary: one row per product (aggregate if multiple runs)
+  // --- PLATFORM-WIDE KPI CALCULATIONS (synced with Run Recon + Exceptions) ---
+  const kpiTotalRuns = allRuns.length;
+
+  const kpiTotalMatched = useMemo(() => allRuns.reduce((sum, r) => {
+    const val = typeof r.matched === 'string' ? parseInt(r.matched.replace(/,/g, '')) : (r.matched || 0);
+    return sum + (isNaN(val) ? 0 : val);
+  }, 0), [allRuns]);
+
+  const kpiTotalExcInRuns = useMemo(() => allRuns.reduce((sum, r) => {
+    const val = typeof r.exceptions === 'string' ? parseInt(r.exceptions.replace(/,/g, '')) : (r.exceptions || 0);
+    return sum + (isNaN(val) ? 0 : val);
+  }, 0), [allRuns]);
+
+  // Matching accuracy: matched / (matched + exceptions from run_history)
+  const kpiMatchAccuracy = useMemo(() => {
+    const total = kpiTotalMatched + kpiTotalExcInRuns;
+    return total > 0 ? ((kpiTotalMatched / total) * 100).toFixed(1) + '%' : '—';
+  }, [kpiTotalMatched, kpiTotalExcInRuns]);
+
+  // Pending exceptions: from exceptions table, not Resolved/Closed
+  const kpiPendingExceptions = useMemo(() =>
+    allExceptions.filter(e => e.status && !['Resolved', 'Closed'].includes(e.status)).length
+  , [allExceptions]);
+
+  // Auto-recon efficiency: % of Automatic/Cron runs that Completed
+  const kpiAutoEfficiency = useMemo(() => {
+    const autoRuns = allRuns.filter(r => r.triggerType && ['Automatic', 'Auto', 'Scheduled'].some(t => r.triggerType.includes(t)));
+    const autoCompleted = autoRuns.filter(r => r.status === 'Completed').length;
+    return autoRuns.length > 0 ? ((autoCompleted / autoRuns.length) * 100).toFixed(1) + '%' : '—';
+  }, [allRuns]);
+
+  const kpis = [
+    { label: 'Total Recon Runs', value: kpiTotalRuns.toString(), sub: `${allRuns.filter(r => r.status === 'Completed').length} completed · ${allRuns.filter(r => r.status === 'Failed').length} failed`, icon: TrendingUp, color: 'var(--primary)' },
+    { label: 'Matching Accuracy', value: kpiMatchAccuracy, sub: `${kpiTotalMatched.toLocaleString('en-IN')} records matched`, icon: CheckCircle2, color: '#059669' },
+    { label: 'Pending Exceptions', value: kpiPendingExceptions.toString(), sub: `${allExceptions.length} total · ${allExceptions.filter(e => e.status === 'Resolved').length} resolved`, icon: AlertCircle, color: '#DC2626' },
+    { label: 'Auto-Recon Efficiency', value: kpiAutoEfficiency, sub: 'of automated runs completed', icon: Cpu, color: 'var(--gold)' },
+  ];
+
+  // --- DAILY SUMMARY (date-filtered, for the table below) ---
+  const dailyRuns = useMemo(() =>
+    allRuns.filter(run => run && run.rawDate === selectedDate)
+  , [allRuns, selectedDate]);
+
   const summary = useMemo(() => {
     const map = {};
     dailyRuns.forEach(run => {
@@ -50,17 +88,6 @@ const Dashboard = () => {
     });
     return Object.values(map);
   }, [dailyRuns]);
-
-  const totalMatched = useMemo(() => summary.reduce((s, r) => s + r.totalMatched, 0), [summary]);
-  const totalExceptions = useMemo(() => summary.reduce((s, r) => s + r.totalExceptions, 0), [summary]);
-  const completedCount = useMemo(() => summary.filter(r => r.statuses.every(s => s === 'Completed')).length, [summary]);
-
-  const kpis = [
-    { label: 'Products Reconciled', value: summary.length.toString(), sub: `on ${selectedDate}`, icon: Layers, color: 'var(--primary)' },
-    { label: 'Total Matched Records', value: totalMatched.toLocaleString('en-IN'), sub: 'across all products', icon: TrendingUp, color: '#059669' },
-    { label: 'Total Exceptions', value: totalExceptions.toLocaleString('en-IN'), sub: 'pending resolution', icon: AlertCircle, color: '#DC2626' },
-    { label: 'Auto-Recon Efficiency', value: totalMatched + totalExceptions > 0 ? `${((totalMatched / (totalMatched + totalExceptions)) * 100).toFixed(1)}%` : '—', sub: 'match rate', icon: Cpu, color: 'var(--gold)' },
-  ];
 
   const handleDateChange = async (e) => {
     const date = e.target.value;
