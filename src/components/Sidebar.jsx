@@ -27,6 +27,7 @@ const Sidebar = () => {
     { id: 'exceptions', label: 'Exception Queue', icon: AlertTriangle, moduleName: 'Exception Queue' },
     { id: 'suggestions', label: 'AI Suggestions', icon: Zap, moduleName: 'AI Suggestions' },
     { id: 'reports', label: 'Reports', icon: FileText, moduleName: 'Reports' },
+    { id: 'query-config', label: 'Query Config', icon: Grid, moduleName: 'Audit Log' }, // Using Audit Log permission for simplicity
     { id: 'audit', label: 'Audit Log', icon: ShieldCheck, moduleName: 'Audit Log' },
     { id: 'users', label: 'Users', icon: Users, moduleName: 'Users' },
     { id: 'roles', label: 'Roles', icon: Grid, moduleName: 'Roles' },

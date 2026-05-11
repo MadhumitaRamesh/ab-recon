@@ -14,6 +14,7 @@ const ExceptionQueue = () => {
   const { 
     exceptions, 
     resolveException, 
+    updateExceptionStatus,
     addNotification,
     logAudit,
     masters, 
@@ -28,6 +29,11 @@ const ExceptionQueue = () => {
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isActioning, setIsActioning] = useState(false);
+
+  // Remarks Modal State
+  const [showRemarksModal, setShowRemarksModal] = useState(false);
+  const [remarks, setRemarks] = useState('');
+  const [pendingStatus, setPendingStatus] = useState('');
 
   // Filter states
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
@@ -110,42 +116,37 @@ const ExceptionQueue = () => {
     fetchFilteredExceptions({});
   };
 
-  const handleApprove = async () => {
+  const handleApprove = () => {
     if (!selectedEx || isActioning) return;
+    setPendingStatus('Resolved');
+    setRemarks('');
+    setShowRemarksModal(true);
+  };
+
+  const handleFlagError = () => {
+    if (!selectedEx || isActioning) return;
+    setPendingStatus('Flagged Error');
+    setRemarks('');
+    setShowRemarksModal(true);
+  };
+
+  const handleConfirmAction = async () => {
+    if (!selectedEx || isActioning || remarks.length < 10) return;
     setIsActioning(true);
     try {
-      const success = await resolveException(selectedEx.id);
+      const success = await updateExceptionStatus(selectedEx.id, pendingStatus, remarks);
       if (success) {
-        addNotification({ title: 'Exception Approved & Closed', message: `Transaction ${selectedEx.id} has been resolved and removed from the queue.` });
-        await logAudit(
-          'Exception Approved',
-          'Exception Queue',
-          `Transaction ${selectedEx.id} | Ref: ${selectedEx.ref || selectedEx.uniqueRef || '—'} | Amount: ₹${selectedEx.amount} | Approved & closed by operator.`,
-          'Operations'
-        );
+        addNotification({ 
+          title: `Exception ${pendingStatus}`, 
+          message: `Transaction ${selectedEx.id} has been marked as ${pendingStatus}.` 
+        });
+        setShowRemarksModal(false);
         setSelectedEx(null);
       } else {
-        addNotification({ title: 'Action Failed', message: 'Could not approve exception. Please try again.' });
+        addNotification({ title: 'Action Failed', message: 'Could not update exception. Please try again.' });
       }
     } catch (e) {
       addNotification({ title: 'Error', message: e.message });
-    } finally {
-      setIsActioning(false);
-    }
-  };
-
-  const handleFlagError = async () => {
-    if (!selectedEx || isActioning) return;
-    setIsActioning(true);
-    try {
-      addNotification({ title: 'Exception Flagged', message: `Transaction ${selectedEx.id} has been escalated for senior review.` });
-      await logAudit(
-        'Exception Escalated',
-        'Exception Queue',
-        `Transaction ${selectedEx.id} | Ref: ${selectedEx.ref || selectedEx.uniqueRef || '—'} | Amount: ₹${selectedEx.amount} | Flagged as error and sent for senior review.`,
-        'Security'
-      );
-      setSelectedEx(null);
     } finally {
       setIsActioning(false);
     }
@@ -375,6 +376,13 @@ const ExceptionQueue = () => {
                 <span style={{ background: '#FEF3C7', color: '#92400E', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700' }}>{selectedEx.priority}</span>
                 <span style={{ background: '#E0F2FE', color: '#0369A1', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', fontWeight: '700' }}>{selectedEx.status}</span>
               </div>
+              
+              {selectedEx.remarks && (
+                <div style={{ marginTop: '16px', borderTop: '1px solid #FFEDD5', paddingTop: '12px' }}>
+                  <div style={{ fontSize: '10px', fontWeight: '800', color: '#C2410C', textTransform: 'uppercase', marginBottom: '4px' }}>Remarks</div>
+                  <div style={{ fontSize: '12px', color: '#9A3412', fontStyle: 'italic', lineHeight: '1.4' }}>"{selectedEx.remarks}"</div>
+                </div>
+              )}
             </div>
 
             {/* AI Suggestions */}
@@ -414,6 +422,59 @@ const ExceptionQueue = () => {
           </div>
         )}
       </div>
+
+      {/* Remarks Modal */}
+      {showRemarksModal && (
+        <div style={{
+          position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+          background: 'rgba(15, 23, 42, 0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          zIndex: 1000, backdropFilter: 'blur(4px)'
+        }}>
+          <div className="card" style={{ width: '450px', padding: '32px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.25)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+              <h3 style={{ fontSize: '18px', fontWeight: '800' }}>{pendingStatus === 'Resolved' ? 'Approve Exception' : 'Flag as Error'}</h3>
+              <button onClick={() => setShowRemarksModal(false)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                <X size={24} />
+              </button>
+            </div>
+            
+            <div style={{ marginBottom: '24px' }}>
+              <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>Add Remarks</label>
+              <textarea
+                className="form-control"
+                placeholder="Enter detailed reason for this action..."
+                value={remarks}
+                onChange={(e) => setRemarks(e.target.value)}
+                style={{ height: '120px', resize: 'none', fontSize: '14px', paddingTop: '12px' }}
+              />
+              <p style={{ marginTop: '10px', fontSize: '12px', color: remarks.length < 10 ? '#EF4444' : '#10B981', fontWeight: '600' }}>
+                {remarks.length < 10 
+                  ? `Remarks are required before proceeding (${10 - remarks.length} more characters needed)`
+                  : 'Requirement met'
+                }
+              </p>
+            </div>
+
+            <div style={{ display: 'flex', gap: '12px' }}>
+              <button 
+                className="btn btn-outline" 
+                onClick={() => setShowRemarksModal(false)}
+                style={{ flex: 1, height: '45px' }}
+              >
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                disabled={remarks.length < 10 || isActioning}
+                onClick={handleConfirmAction}
+                style={{ flex: 2, height: '45px', opacity: (remarks.length < 10 || isActioning) ? 0.6 : 1 }}
+              >
+                {isActioning ? 'Processing...' : 'Confirm Action'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

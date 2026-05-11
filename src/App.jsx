@@ -11,6 +11,7 @@ import Users from './pages/Users';
 import RunRecon from './pages/RunRecon';
 import AiSuggestions from './pages/AiSuggestions';
 import Reports from './pages/Reports';
+import QueryConfig from './pages/QueryConfig';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 
@@ -66,6 +67,7 @@ function App() {
       case 'users': return <Users />;
       case 'roles': return <Roles />;
       case 'permissions': return <ModuleAccess />;
+      case 'query-config': return <QueryConfig />;
       default: return <Dashboard />;
     }
   };

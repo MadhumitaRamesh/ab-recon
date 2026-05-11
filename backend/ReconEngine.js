@@ -43,11 +43,41 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
         // 1. Dynamic Data Retrieval based on Configuration
         for (const source of sources) {
             const sourceType = (source.type || '').trim();
-            if (sourceType === 'Automatic' || sourceType === 'DB-Table') {
+            const sourceLabel = source.name || source.id;
+
+            if (sourceType === 'Automatic' || sourceType === 'DB-Table' || sourceType === 'API-Based' || sourceType === 'External API') {
                 try {
-                    const [rows] = await db.promise().query(`SELECT * FROM ?? LIMIT 100`, [source.tableName]);
+                    // Check for custom query config
+                    const [configs] = await db.promise().query(
+                        'SELECT * FROM recon_query_config WHERE recon_master_id = ? AND source_label = ?',
+                        [masterConfig.id, sourceLabel]
+                    );
+
+                    let rows;
+                    if (configs.length > 0) {
+                        const config = configs[0];
+                        let query = config.custom_query_template;
+                        
+                        // Handle placeholders
+                        query = query.replace(/{{date}}/g, runDate);
+                        query = query.replace(/{{product}}/g, masterConfig.name);
+                        
+                        // Handle time offsets if needed (calculate timestamps)
+                        const runDateObj = new Date(runDate);
+                        const startTimestamp = new Date(runDateObj.getTime() + (config.time_offset_minutes * 60000));
+                        const endTimestamp = new Date(runDateObj.getTime() + (24 * 60 * 60 * 1000) - 1000);
+                        
+                        query = query.replace(/{{start_timestamp}}/g, startTimestamp.toISOString().slice(0, 19).replace('T', ' '));
+                        query = query.replace(/{{end_timestamp}}/g, endTimestamp.toISOString().slice(0, 19).replace('T', ' '));
+
+                        console.log(`[ENGINE] Using custom query for ${sourceLabel}: ${query.substring(0, 100)}...`);
+                        [rows] = await db.promise().query(query);
+                    } else if (sourceType === 'Automatic' || sourceType === 'DB-Table') {
+                        [rows] = await db.promise().query(`SELECT * FROM ?? LIMIT 100`, [source.tableName]);
+                    }
+
                     if (!rows || rows.length === 0) {
-                        console.log(`[ENGINE] Table ${source.tableName} empty, using synthetic data.`);
+                        console.log(`[ENGINE] No data found for ${sourceLabel}, using synthetic data.`);
                         sourceData[source.id] = generateSyntheticData(source.id, masterConfig.name, sharedPool);
                     } else {
                         sourceData[source.id] = rows.map(r => ({
@@ -57,12 +87,9 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
                         }));
                     }
                 } catch (err) {
-                    console.warn(`[ENGINE] Source table [${source.tableName}] not accessible: ${err.message}. Using synthetic data.`);
+                    console.warn(`[ENGINE] Source [${sourceLabel}] retrieval failed: ${err.message}. Using synthetic data.`);
                     sourceData[source.id] = generateSyntheticData(source.id, masterConfig.name, sharedPool);
                 }
-            } else if (sourceType === 'API-Based' || sourceType === 'External API') {
-                console.log(`[ENGINE] Source ${source.id} (${source.name}) is API-Based — using synthetic data.`);
-                sourceData[source.id] = generateSyntheticData(source.id, masterConfig.name, sharedPool);
             } else if (sourceType === 'Manual Upload') {
                 const provided = manualData[source.id];
                 sourceData[source.id] = (provided && provided.length > 0)

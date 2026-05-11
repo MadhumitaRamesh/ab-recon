@@ -309,6 +309,25 @@ app.delete('/api/exceptions/:id', (req, res) => {
     });
 });
 
+app.put('/api/exceptions/:id', (req, res) => {
+    const { status, remarks } = req.body;
+    const { id } = req.params;
+    console.log(`[API] Updating Exception | ID: ${id} | Status: ${status} | Remarks: ${remarks}`);
+    
+    db.query(
+        'UPDATE exceptions SET status = ?, remarks = ? WHERE id = ?',
+        [status, remarks, id],
+        (err, results) => {
+            if (err) {
+                console.error(`[API] DB Error updating exception ${id}:`, err.message);
+                return res.status(500).json({ error: err.message });
+            }
+            console.log(`[API] Exception ${id} updated successfully. Rows affected: ${results.affectedRows}`);
+            res.json({ success: true });
+        }
+    );
+});
+
 // --- AUDIT LOGS ---
 app.get('/api/audit-logs', (req, res) => {
     db.query('SELECT * FROM audit_logs ORDER BY id DESC', (err, results) => {
@@ -363,6 +382,24 @@ app.post('/api/recon/trigger', async (req, res) => {
     // RBAC temporarily disabled for debugging preflight issues
     const { masterId, runDate, triggerType, manualData } = req.body;
     console.log(`[API] Recon Triggered | Master: ${masterId} | Date: ${runDate} | Type: ${triggerType}`);
+    
+    // Backend File Validation
+    if (manualData) {
+        for (const [sourceId, fileInfo] of Object.entries(manualData)) {
+            if (fileInfo && typeof fileInfo === 'object' && fileInfo.name) {
+                const extension = fileInfo.name.split('.').pop().toLowerCase();
+                if (!['csv', 'xlsx'].includes(extension)) {
+                    console.warn(`[API] Rejected invalid file type: ${fileInfo.name}`);
+                    return res.status(400).json({ error: 'Only CSV and XLSX files are accepted' });
+                }
+                if (fileInfo.size > 10 * 1024 * 1024) {
+                    console.warn(`[API] Rejected oversized file: ${fileInfo.name} (${fileInfo.size} bytes)`);
+                    return res.status(400).json({ error: 'File size must be under 10MB' });
+                }
+            }
+        }
+    }
+
     try {
         const [masters] = await db.promise().query('SELECT * FROM masters WHERE id = ?', [masterId]);
         if (masters.length === 0) return res.status(404).json({ error: 'Master not found' });
@@ -446,6 +483,39 @@ app.post('/api/notifications', (req, res) => {
 
 app.patch('/api/notifications/read', (req, res) => {
     db.query('UPDATE notifications SET is_read = 1', (err) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json({ success: true });
+    });
+});
+
+// --- RECON QUERY CONFIG ---
+app.get('/api/query-configs', (req, res) => {
+    db.query('SELECT * FROM recon_query_config', (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+app.post('/api/query-configs', (req, res) => {
+    const { recon_master_id, source_label, custom_query_template, time_offset_minutes, created_by } = req.body;
+    console.log(`[API] Saving Query Config | Master: ${recon_master_id} | Source: ${source_label} | Offset: ${time_offset_minutes}`);
+    
+    db.query(
+        'INSERT INTO recon_query_config (recon_master_id, source_label, custom_query_template, time_offset_minutes, created_by) VALUES (?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE custom_query_template = ?, time_offset_minutes = ?, updated_at = CURRENT_TIMESTAMP',
+        [recon_master_id, source_label, custom_query_template, time_offset_minutes, created_by, custom_query_template, time_offset_minutes],
+        (err, results) => {
+            if (err) {
+                console.error('[API] Error saving query config:', err.message);
+                return res.status(500).json({ error: err.message });
+            }
+            console.log(`[API] Query Config saved successfully. ID: ${results.insertId || 'Updated existing'}`);
+            res.json({ success: true, id: results.insertId });
+        }
+    );
+});
+
+app.delete('/api/query-configs/:id', (req, res) => {
+    db.query('DELETE FROM recon_query_config WHERE id = ?', [req.params.id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true });
     });

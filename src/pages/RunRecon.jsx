@@ -41,7 +41,8 @@ const RunRecon = () => {
   const [isFinished, setIsFinished] = useState(false);
   const [terminalLogs, setTerminalLogs] = useState(['> System Standby. Waiting for execution trigger...']);
   const [stepIndex, setStepIndex] = useState(-1);
-  const [fileSelections, setFileSelections] = useState({}); // { sourceId: fileName }
+  const [fileSelections, setFileSelections] = useState({}); // { sourceId: {name, size} }
+  const [fileErrors, setFileErrors] = useState({}); // { sourceId: errorMsg }
   const terminalRef = useRef(null);
   const finishTriggered = useRef(false);
 
@@ -71,6 +72,7 @@ const RunRecon = () => {
   // Reset file selections when master changes
   useEffect(() => {
     setFileSelections({});
+    setFileErrors({});
     setStepIndex(-1);
     setTerminalLogs(['> System Standby. Waiting for execution trigger...']);
     setIsFinished(false);
@@ -114,7 +116,7 @@ const RunRecon = () => {
   const finalizeRun = async () => {
     console.log('[DEBUG] Finalizing run for date:', runDate);
     try {
-      const result = await triggerReconRun(selectedMaster.id, runDate, selectedMaster.run_mode || 'Manual');
+      const result = await triggerReconRun(selectedMaster.id, runDate, selectedMaster.run_mode || 'Manual', fileSelections);
       console.log('[DEBUG] Run result:', result);
       
       // Sync the history filter date to the run date so the new entry is immediately visible
@@ -164,8 +166,29 @@ const RunRecon = () => {
 
   const filteredHistory = runHistory || [];
 
-  const handleFileChange = (sourceId, fileName) => {
-    setFileSelections(prev => ({ ...prev, [sourceId]: fileName }));
+  const handleFileChange = (sourceId, file) => {
+    if (!file) return;
+    setFileErrors(prev => ({ ...prev, [sourceId]: null }));
+
+    const allowedExtensions = ['csv', 'xlsx'];
+    const extension = file.name.split('.').pop().toLowerCase();
+
+    if (!allowedExtensions.includes(extension)) {
+      setFileErrors(prev => ({ ...prev, [sourceId]: 'Only CSV and XLSX files are accepted' }));
+      addNotification({ title: 'Invalid File Type', message: 'Only CSV and XLSX files are accepted', type: 'error' });
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setFileErrors(prev => ({ ...prev, [sourceId]: 'File size must be under 10MB' }));
+      addNotification({ title: 'File Too Large', message: 'File size must be under 10MB', type: 'error' });
+      return;
+    }
+
+    setFileSelections(prev => ({ 
+      ...prev, 
+      [sourceId]: { name: file.name, size: file.size } 
+    }));
   };
 
   return (
@@ -224,8 +247,8 @@ const RunRecon = () => {
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'white', borderRadius: '12px', border: fileSelections[source.id] ? '1px solid #10B981' : '1px solid #E2E8F0' }}>
                         <div>
                           <div style={{ fontSize: '13px', fontWeight: '800' }}>{source.name}</div>
-                          <div style={{ fontSize: '11px', color: fileSelections[source.id] ? '#10B981' : '#94A3B8', fontWeight: '600' }}>
-                            {fileSelections[source.id] ? `✓ ${fileSelections[source.id]}` : 'CSV/XLSX required'}
+                          <div style={{ fontSize: '11px', color: fileErrors[source.id] ? '#DC2626' : (fileSelections[source.id] ? '#10B981' : '#94A3B8'), fontWeight: '600' }}>
+                            {fileErrors[source.id] ? `⚠ ${fileErrors[source.id]}` : (fileSelections[source.id] ? `✓ ${fileSelections[source.id].name}` : 'CSV/XLSX required')}
                           </div>
                         </div>
                         <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', fontSize: '12px', fontWeight: '800', padding: '8px 12px', background: 'rgba(123, 17, 19, 0.05)', borderRadius: '8px' }}>
@@ -234,7 +257,7 @@ const RunRecon = () => {
                             type="file" 
                             style={{ display: 'none' }} 
                             disabled={isRunning} 
-                            onChange={(e) => handleFileChange(source.id, e.target.files[0]?.name)}
+                            onChange={(e) => handleFileChange(source.id, e.target.files[0])}
                           />
                         </label>
                       </div>

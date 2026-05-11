@@ -16,6 +16,7 @@ export const AppProvider = ({ children }) => {
   const [users, setUsers] = useState([]);
   const [notifications, setNotifications] = useState([]);
   const [aiSuggestions, setAiSuggestions] = useState([]);
+  const [queryConfigs, setQueryConfigs] = useState([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [exceptionFilters, setExceptionFilters] = useState({ runId: '', masterId: '' });
@@ -83,7 +84,8 @@ export const AppProvider = ({ children }) => {
       ref: e.ref_no, type: e.type, age: e.age || '0 days', priority: e.priority, status: e.status,
       masterId: e.recon_master_id, product: e.product_name || 'Unknown', runId: e.run_id,
       runDate: datePart ? new Date(datePart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '--',
-      sourceType: e.source_type, uniqueRef: e.unique_reference_number, assignedRole: e.assigned_role || 'Operations'
+      sourceType: e.source_type, uniqueRef: e.unique_reference_number, assignedRole: e.assigned_role || 'Operations',
+      remarks: e.remarks || ''
     };
   }, []);
 
@@ -115,7 +117,7 @@ export const AppProvider = ({ children }) => {
         return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
       };
       const localToday = getLocalDate();
-      const [rawUsers, rawMasters, rawExceptions, rawAudit, rawHistory, rawNotifs, rawAI, rawPerms, rawRoles] = await Promise.all([
+      const [rawUsers, rawMasters, rawExceptions, rawAudit, rawHistory, rawNotifs, rawAI, rawPerms, rawRoles, rawQueryConfigs] = await Promise.all([
         fetch(`${API_URL}/users`).then(r => r.json()),
         fetch(`${API_URL}/masters`).then(r => r.json()),
         fetch(`${API_URL}/exceptions?date=${localToday}`).then(r => r.json()),
@@ -125,6 +127,7 @@ export const AppProvider = ({ children }) => {
         fetch(`${API_URL}/ai-suggestions`).then(r => r.json()),
         fetch(`${API_URL}/permissions`).then(r => r.json()),
         fetch(`${API_URL}/roles`).then(r => r.json()),
+        fetch(`${API_URL}/query-configs`).then(r => r.json()),
       ]);
 
       setUsers(Array.isArray(rawUsers) ? rawUsers.map(normalizeUser) : []);
@@ -136,6 +139,7 @@ export const AppProvider = ({ children }) => {
       setAiSuggestions(Array.isArray(rawAI) ? rawAI.map(normalizeAiSuggestion) : []);
       setRoles(Array.isArray(rawRoles) ? rawRoles : []);
       setPermissions(normalizePermissions(rawPerms));
+      setQueryConfigs(Array.isArray(rawQueryConfigs) ? rawQueryConfigs : []);
     } catch (err) { console.warn('Sync failed', err.message); }
   }, [normalizeUser, normalizeException, normalizeAuditLog, normalizeRunHistory, normalizeNotification, normalizeAiSuggestion, normalizePermissions]);
 
@@ -246,9 +250,16 @@ export const AppProvider = ({ children }) => {
     return true;
   };
 
-  const triggerReconRun = useCallback(async (masterId, runDate, triggerType) => {
-    const res = await fetch(`${API_URL}/recon/trigger`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ masterId, runDate, triggerType }) });
-    if (!res.ok) throw new Error('Trigger Failed');
+  const triggerReconRun = useCallback(async (masterId, runDate, triggerType, manualData = null) => {
+    const res = await fetch(`${API_URL}/recon/trigger`, { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ masterId, runDate, triggerType, manualData }) 
+    });
+    if (!res.ok) {
+      const errorData = await res.json();
+      throw new Error(errorData.error || 'Trigger Failed');
+    }
     const result = await res.json();
     await fetchAll();
     return result;
@@ -305,6 +316,20 @@ export const AppProvider = ({ children }) => {
     if (res.ok) { fetchAll(); logAudit('Exception Resolved', 'Exception', `Transaction ${id} closed`, 'Operations'); return true; }
     return false;
   };
+  
+  const updateExceptionStatus = async (id, status, remarks) => {
+    const res = await fetch(`${API_URL}/exceptions/${id}`, { 
+      method: 'PUT', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ status, remarks }) 
+    });
+    if (res.ok) { 
+      fetchAll(); 
+      logAudit('Exception Updated', 'Exception', `Transaction ${id} set to ${status} with remarks`, 'Operations'); 
+      return true; 
+    }
+    return false;
+  };
 
   const fetchSuggestions = async (exceptionId) => {
     const res = await fetch(`${API_URL}/suggestions/${exceptionId}`);
@@ -329,6 +354,22 @@ export const AppProvider = ({ children }) => {
       console.error('System reset failed:', err);
       throw err;
     }
+  };
+
+  const saveQueryConfig = async (config) => {
+    const res = await fetch(`${API_URL}/query-configs`, { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/json' }, 
+      body: JSON.stringify({ ...config, created_by: user?.name || 'Admin' }) 
+    });
+    if (res.ok) { fetchAll(); return true; }
+    return false;
+  };
+
+  const deleteQueryConfig = async (id) => {
+    const res = await fetch(`${API_URL}/query-configs/${id}`, { method: 'DELETE' });
+    if (res.ok) { fetchAll(); return true; }
+    return false;
   };
 
   const login = async (employeeId, password) => {
@@ -356,13 +397,14 @@ export const AppProvider = ({ children }) => {
       roles, setRoles, addRole, updateRole, deleteRole,
       permissions, setPermissions, savePermission, saveAllPermissions,
       masters, setMasters, addMaster, updateMaster, deleteMaster,
-      exceptions, setExceptions, resolveException,
+      exceptions, setExceptions, resolveException, updateExceptionStatus,
       aiSuggestions, setAiSuggestions,
       users, setUsers, addUser, updateUser, deleteUser,
       auditLogs, setAuditLogs, logAudit,
       runHistory, fetchFilteredHistory,
       fetchFilteredExceptions, triggerReconRun,
       notifications, addNotification, markAllAsRead,
+      queryConfigs, saveQueryConfig, deleteQueryConfig,
       searchQuery, setSearchQuery, sidebarOpen, setSidebarOpen,
       login, logout, modules, fetchAll, fetchSuggestions,
       exceptionFilters, setExceptionFilters, resetSystemData

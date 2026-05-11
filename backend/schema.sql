@@ -40,7 +40,8 @@ CREATE TABLE IF NOT EXISTS exceptions (
     type VARCHAR(50),
     age VARCHAR(10),
     priority VARCHAR(20),
-    status VARCHAR(50)
+    status VARCHAR(50),
+    remarks TEXT
 );
 
 -- 5. Forensic Audit Logs
