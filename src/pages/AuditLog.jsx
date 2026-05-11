@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Clock, User, Filter, Download, ShieldCheck, ChevronDown, CheckCircle, Hash, Server } from 'lucide-react';
 
 const AuditLog = () => {
-  const { auditLogs, addNotification, resetSystemData } = useApp();
+  const { auditLogs, addNotification, resetSystemData, searchQuery } = useApp();
   const [filterType, setFilterType] = useState('All');
   const [showFilters, setShowFilters] = useState(false);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -12,9 +12,18 @@ const AuditLog = () => {
     setIsLoaded(true);
   }, []);
 
-  const filteredLogs = auditLogs.filter(log => 
-    filterType === 'All' || log.type === filterType
-  );
+  const filteredLogs = auditLogs.filter(log => {
+    const matchesType = filterType === 'All' || log.type === filterType;
+    if (!searchQuery) return matchesType;
+    
+    const q = searchQuery.toLowerCase();
+    const matchesSearch = 
+      log.action?.toLowerCase().includes(q) || 
+      log.user?.toLowerCase().includes(q) || 
+      log.detail?.toLowerCase().includes(q);
+      
+    return matchesType && matchesSearch;
+  });
 
   const handleExport = () => {
     addNotification({ title: 'Exporting Audit Log', message: 'Generating immutable log report (CSV)...' });

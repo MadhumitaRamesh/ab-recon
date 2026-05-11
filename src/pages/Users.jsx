@@ -3,10 +3,9 @@ import { useApp } from '../context/AppContext';
 import { UserPlus, Search, Edit3, Trash2, X, Hash, Shield, CheckCircle, Save } from 'lucide-react';
 
 const Users = () => {
-  const { users, roles, setUsers, addUser, updateUser, deleteUser, addNotification } = useApp();
+  const { users, roles, setUsers, addUser, updateUser, deleteUser, addNotification, searchQuery } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [searchQuery, setSearchQuery] = useState('');
   const [filterRole, setFilterRole] = useState('All');
   const [formData, setFormData] = useState({ name: '', employeeId: '', role: '', status: 'Active', password: '' });
   const [isLoaded, setIsLoaded] = useState(false);
@@ -74,17 +73,9 @@ const Users = () => {
         </button>
       </div>
 
-      <div style={{ display: 'flex', gap: '16px', marginBottom: '32px', flexWrap: 'wrap' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: '300px' }}>
-          <Search size={18} style={{ position: 'absolute', left: '16px', top: '16px', color: '#94A3B8' }} />
-          <input 
-            type="text" 
-            className="form-control" 
-            placeholder="Search by name or employee ID..." 
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ paddingLeft: '50px', height: '52px' }}
-          />
+      <div style={{ display: 'flex', gap: '16px', marginBottom: '32px', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#64748B', fontSize: '13px', fontWeight: '600' }}>
+          <Search size={16} /> Global Search Filter Active
         </div>
         <select 
           className="form-control" 

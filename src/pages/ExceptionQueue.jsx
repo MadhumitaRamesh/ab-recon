@@ -21,7 +21,8 @@ const ExceptionQueue = () => {
     fetchFilteredExceptions,
     fetchSuggestions,
     exceptionFilters,
-    setExceptionFilters
+    setExceptionFilters,
+    searchQuery
   } = useApp();
   
   const [selectedEx, setSelectedEx] = useState(null);
@@ -165,7 +166,16 @@ const ExceptionQueue = () => {
     setTimeout(() => alert('Forensic_Audit_Trail_Filtered.xlsx downloaded.'), 1500);
   };
 
-  const filteredExceptions = exceptions || [];
+  const filteredExceptions = (exceptions || []).filter(ex => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      ex.id?.toString().toLowerCase().includes(q) ||
+      ex.ref?.toLowerCase().includes(q) ||
+      ex.uniqueRef?.toLowerCase().includes(q) ||
+      ex.product?.toLowerCase().includes(q)
+    );
+  });
 
   // ── RENDER ────────────────────────────────────────────────────────────────
 

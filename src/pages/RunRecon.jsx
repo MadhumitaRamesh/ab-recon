@@ -29,6 +29,7 @@ const RunRecon = () => {
     triggerReconRun, 
     setActivePage, 
     setExceptionFilters,
+    searchQuery,
     fetchAll
   } = useApp();
   const [selectedMasterId, setSelectedMasterId] = useState('');
@@ -164,7 +165,14 @@ const RunRecon = () => {
     // In a real app, we'd also filter the audit log
   };
 
-  const filteredHistory = runHistory || [];
+  const filteredHistory = (runHistory || []).filter(run => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      run.id?.toString().toLowerCase().includes(q) ||
+      run.product?.toLowerCase().includes(q)
+    );
+  });
 
   const handleFileChange = (sourceId, file) => {
     if (!file) return;
