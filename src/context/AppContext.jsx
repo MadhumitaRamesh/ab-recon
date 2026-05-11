@@ -30,13 +30,13 @@ export const AppProvider = ({ children }) => {
     const perms = {};
     modules.forEach(mod => {
       perms[mod] = {};
-      ['Admin', 'Ops_Maker', 'Ops_Checker', 'CS User', 'BU_User'].forEach(role => {
+      ['Admin', 'Ops_Maker', 'Ops_Checker', 'CS_User', 'BU_User'].forEach(role => {
         perms[mod][role] = role === 'Admin';
       });
     });
     perms['Dashboard']['Ops_Maker'] = true;
     perms['Dashboard']['Ops_Checker'] = true;
-    perms['Dashboard']['CS User'] = true;
+    perms['Dashboard']['CS_User'] = true;
     perms['Dashboard']['BU_User'] = true;
     perms['Recon Masters']['Ops_Maker'] = true;
     perms['Run Recon']['Ops_Maker'] = true;
@@ -45,8 +45,7 @@ export const AppProvider = ({ children }) => {
     perms['AI Suggestions']['Ops_Maker'] = true;
     perms['AI Suggestions']['Ops_Checker'] = true;
     perms['Reports']['Ops_Maker'] = true;
-    perms['Reports']['Ops_Checker'] = true;
-    perms['Reports']['CS User'] = true;
+    perms['Reports']['CS_User'] = true;
     perms['Reports']['BU_User'] = true;
     perms['Query Config']['Ops_Maker'] = true;
     return perms;
