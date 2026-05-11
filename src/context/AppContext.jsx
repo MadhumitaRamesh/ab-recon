@@ -23,7 +23,7 @@ export const AppProvider = ({ children }) => {
 
   const modules = [
     'Dashboard', 'Recon Masters', 'Run Recon', 'Exception Queue',
-    'AI Suggestions', 'Reports', 'Audit Log', 'Users', 'Roles', 'Permissions'
+    'AI Suggestions', 'Reports', 'Query Config', 'Audit Log', 'Users', 'Roles', 'Permissions'
   ];
 
   const getDefaultPermissions = () => {
@@ -48,6 +48,7 @@ export const AppProvider = ({ children }) => {
     perms['Reports']['Ops_Checker'] = true;
     perms['Reports']['CS User'] = true;
     perms['Reports']['BU_User'] = true;
+    perms['Query Config']['Ops_Maker'] = true;
     return perms;
   };
 
