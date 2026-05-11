@@ -163,6 +163,25 @@ app.post('/api/permissions', (req, res) => {
     );
 });
 
+app.post('/api/permissions/bulk', (req, res) => {
+    const { permissions } = req.body; // Expects array of {module_name, role_name, is_allowed}
+    if (!permissions || !Array.isArray(permissions)) return res.status(400).json({ error: 'Invalid payload' });
+
+    const values = permissions.map(p => [p.module_name, p.role_name, p.is_allowed]);
+    
+    db.query(
+        'INSERT INTO permissions (module_name, role_name, is_allowed) VALUES ? ON DUPLICATE KEY UPDATE is_allowed = VALUES(is_allowed)',
+        [values],
+        (err) => {
+            if (err) {
+                console.error('[API] Bulk Permission Error:', err.message);
+                return res.status(500).json({ error: err.message });
+            }
+            res.json({ success: true, count: values.length });
+        }
+    );
+});
+
 // --- MASTERS ---
 app.get('/api/masters', (req, res) => {
     db.query('SELECT * FROM masters', (err, results) => {

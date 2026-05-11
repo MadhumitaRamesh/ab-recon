@@ -8,7 +8,7 @@ export const AppProvider = ({ children }) => {
   const [activePage, setActivePage] = useState('dashboard');
 
   const [roles, setRoles] = useState([]);
-  const [permissions, setPermissions] = useState(null);
+  const [permissions, setPermissions] = useState({});
   const [masters, setMasters] = useState([]);
   const [exceptions, setExceptions] = useState([]);
   const [auditLogs, setAuditLogs] = useState([]);
@@ -144,6 +144,7 @@ export const AppProvider = ({ children }) => {
   }, [normalizeUser, normalizeException, normalizeAuditLog, normalizeRunHistory, normalizeNotification, normalizeAiSuggestion, normalizePermissions]);
 
   useEffect(() => {
+    setPermissions(getDefaultPermissions());
     fetchAll();
     const interval = setInterval(fetchAll, 60000);
     return () => clearInterval(interval);
@@ -239,15 +240,30 @@ export const AppProvider = ({ children }) => {
   };
 
   const saveAllPermissions = async (perms) => {
-    const promises = [];
+    const payload = [];
     Object.keys(perms).forEach(modName => {
       Object.keys(perms[modName]).forEach(roleName => {
-        promises.push(fetch(`${API_URL}/permissions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ module_name: modName, role_name: roleName, is_allowed: perms[modName][roleName] ? 1 : 0 }) }));
+        payload.push({
+          module_name: modName,
+          role_name: roleName,
+          is_allowed: perms[modName][roleName] ? 1 : 0
+        });
       });
     });
-    await Promise.all(promises);
-    fetchAll();
-    return true;
+
+    try {
+      const res = await fetch(`${API_URL}/permissions/bulk`, { 
+        method: 'POST', 
+        headers: { 'Content-Type': 'application/json' }, 
+        body: JSON.stringify({ permissions: payload }) 
+      });
+      if (!res.ok) throw new Error('Bulk Update Failed');
+      await fetchAll();
+      return true;
+    } catch (err) {
+      console.error('[API] Bulk Save Error:', err);
+      return false;
+    }
   };
 
   const triggerReconRun = useCallback(async (masterId, runDate, triggerType, manualData = null) => {
