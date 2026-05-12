@@ -5,7 +5,8 @@ const API_URL = 'http://127.0.0.1:5001/api';
 
 export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [activePage, setActivePage] = useState('dashboard');
+  const [activePageInternal, setActivePageInternal] = useState('dashboard');
+  const [searchQuery, setSearchQuery] = useState('');
 
   const [roles, setRoles] = useState([]);
   const [permissions, setPermissions] = useState({});
@@ -17,9 +18,15 @@ export const AppProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [aiSuggestions, setAiSuggestions] = useState([]);
   const [queryConfigs, setQueryConfigs] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [exceptionFilters, setExceptionFilters] = useState({ runId: '', masterId: '' });
+
+  const setActivePage = (page) => {
+    setSearchQuery(''); // Clear search on page change for better UX
+    setActivePageInternal(page);
+  };
+
+  const activePage = activePageInternal;
 
   const modules = [
     'Dashboard', 'Recon Masters', 'Run Recon', 'Exception Queue',
@@ -60,22 +67,24 @@ export const AppProvider = ({ children }) => {
   const normalizeRunHistory = useCallback((r) => {
     const datePart = r.run_date ? (typeof r.run_date === 'string' ? r.run_date.split('T')[0] : r.run_date.toISOString().split('T')[0]) : null;
     return {
-      id: r.id, product: r.product, status: r.status, triggerType: r.trigger_type || 'Manual',
-      matched: Number(r.matched_count || 0), exceptions: Number(r.exception_count || 0),
-      time: r.run_time ? r.run_time.substring(0, 5) : '--',
-      startTime: r.start_time ? r.start_time.substring(0, 5) : '--',
-      endTime: r.end_time ? r.end_time.substring(0, 5) : '--',
+      id: r.id, product: r.product, triggerType: r.trigger_type,
+      rawDate: datePart,
       date: datePart ? new Date(datePart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '--',
-      rawDate: datePart, rawTime: r.run_time
+      status: r.status, matched: Number(r.matched_count).toLocaleString('en-IN'),
+      exceptions: Number(r.exception_count).toLocaleString('en-IN'),
+      startTime: r.start_time ? new Date(r.start_time).toLocaleTimeString() : '--',
+      endTime: r.end_time ? new Date(r.end_time).toLocaleTimeString() : '--'
     };
   }, []);
 
-  const normalizeAuditLog = useCallback((a) => ({
-    id: a.id, user: a.user_name, action: a.action, module: a.module, detail: a.detail,
-    time: a.log_time ? a.log_time.substring(0, 5) : '--',
-    date: a.log_date ? new Date(a.log_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '--',
-    type: a.type, hash: a.forensic_hash
-  }), []);
+  const normalizeAuditLog = useCallback((l) => {
+    const d = new Date(l.created_at);
+    return {
+      id: l.id, action: l.action, user: l.user_name, detail: l.detail, type: l.type,
+      date: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
+      time: d.toLocaleTimeString(), hash: l.forensic_hash
+    };
+  }, []);
 
   const normalizeException = useCallback((e) => {
     const datePart = e.run_date ? (typeof e.run_date === 'string' ? e.run_date.split('T')[0] : e.run_date.toISOString().split('T')[0]) : null;
@@ -159,42 +168,82 @@ export const AppProvider = ({ children }) => {
     setNotifications(prev => [{ ...notif, id: Date.now(), time: 'Just now', read: false }, ...prev]);
   }, []);
 
-  const logAudit = useCallback(async (action, module, detail, type = 'System') => {
-    const forensicHash = btoa(Math.random().toString()).substring(0, 12);
-    const newLog = {
-      id: Date.now(), user: user ? user.name : 'System', action, module, detail, type,
-      hash: forensicHash, time: new Date().toLocaleTimeString('en-GB'), date: new Date().toISOString().split('T')[0]
-    };
-    setAuditLogs(prev => [newLog, ...prev]);
-    try {
-      await fetch(`${API_URL}/audit-logs`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_name: newLog.user, action, module, detail, type, forensic_hash: forensicHash })
-      });
-    } catch (e) {}
-  }, [user]);
+  const logAudit = async (action, type, detail, category) => {
+    await fetch(`${API_URL}/audit-logs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action, type, detail, category, user_name: user?.employeeId || 'System' })
+    });
+    fetchAll();
+  };
 
-  // CRUD Actions
+  const fetchFilteredHistory = async (filters) => {
+    const q = new URLSearchParams(filters).toString();
+    const res = await fetch(`${API_URL}/run-history?${q}`);
+    const data = await res.json();
+    if (Array.isArray(data)) setRunHistory(data.map(normalizeRunHistory));
+  };
+
+  const fetchFilteredExceptions = async (filters) => {
+    const q = new URLSearchParams(filters).toString();
+    const res = await fetch(`${API_URL}/exceptions?${q}`);
+    const data = await res.json();
+    if (Array.isArray(data)) setExceptions(data.map(normalizeException));
+  };
+
+  const triggerReconRun = async (masterId, runDate, triggerType, manualData) => {
+    const res = await fetch(`${API_URL}/recon/trigger`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ masterId, runDate, triggerType, manualData })
+    });
+    const data = await res.json();
+    if (res.ok) { 
+      await fetchAll(); 
+      // Force refresh for the specific run date to ensure immediate UI sync
+      await fetchFilteredHistory({ date: runDate });
+      await fetchFilteredExceptions({ date: runDate });
+      return data; 
+    }
+    throw new Error(data.error || 'Execution failed');
+  };
+
+  const resolveException = async (id, remarks) => {
+    const res = await fetch(`${API_URL}/exceptions/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ remarks, status: 'Resolved' })
+    });
+    if (res.ok) { fetchAll(); logAudit('Exception Resolved', 'Recon', `ID: ${id}`, 'System'); return true; }
+    return false;
+  };
+
+  const updateExceptionStatus = async (id, status) => {
+    const res = await fetch(`${API_URL}/exceptions/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ status })
+    });
+    if (res.ok) { fetchAll(); return true; }
+    return false;
+  };
+
   const addUser = async (userData) => {
     const res = await fetch(`${API_URL}/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(userData) });
-    if (res.ok) { fetchAll(); logAudit('User Created', 'Identity', `User ${userData.name} added`, 'Security'); return true; }
-    return false;
+    const data = await res.json();
+    if (res.ok) { fetchAll(); logAudit('User Provisioned', 'Identity', `${userData.name}`, 'Security'); return { success: true }; }
+    return { success: false, error: data.error };
   };
 
   const updateUser = async (id, userData) => {
-    const res = await fetch(`${API_URL}/users/${id}`, { 
-      method: 'PUT', 
-      headers: { 'Content-Type': 'application/json' }, 
-      body: JSON.stringify({ name: userData.name, employee_id: userData.employeeId, role_name: userData.role, status: userData.status }) 
-    });
-    if (res.ok) { fetchAll(); logAudit('User Updated', 'Identity', `User ${id} modified`, 'Security'); return true; }
+    const res = await fetch(`${API_URL}/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(userData) });
+    if (res.ok) { fetchAll(); logAudit('User Updated', 'Identity', `ID: ${id}`, 'Security'); return true; }
     return false;
   };
 
-  const deleteUser = async (id, name) => {
+  const deleteUser = async (id, name, employeeId) => {
     const res = await fetch(`${API_URL}/users/${id}`, { method: 'DELETE' });
-    if (res.ok) { fetchAll(); logAudit('User Deleted', 'Identity', `User ${name} removed`, 'Security'); return true; }
+    if (res.ok) { fetchAll(); logAudit('User Deleted', 'Identity', `${name} (${employeeId})`, 'Security'); return true; }
     return false;
   };
 
@@ -250,133 +299,20 @@ export const AppProvider = ({ children }) => {
         });
       });
     });
-
-    try {
-      const res = await fetch(`${API_URL}/permissions/bulk`, { 
-        method: 'POST', 
-        headers: { 'Content-Type': 'application/json' }, 
-        body: JSON.stringify({ permissions: payload }) 
-      });
-      if (!res.ok) throw new Error('Bulk Update Failed');
-      await fetchAll();
-      return true;
-    } catch (err) {
-      console.error('[API] Bulk Save Error:', err);
-      return false;
-    }
-  };
-
-  const triggerReconRun = useCallback(async (masterId, runDate, triggerType, manualData = null) => {
-    const res = await fetch(`${API_URL}/recon/trigger`, { 
-      method: 'POST', 
-      headers: { 'Content-Type': 'application/json' }, 
-      body: JSON.stringify({ masterId, runDate, triggerType, manualData }) 
+    const res = await fetch(`${API_URL}/permissions/bulk`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ permissions: payload })
     });
-    if (!res.ok) {
-      const errorData = await res.json();
-      throw new Error(errorData.error || 'Trigger Failed');
-    }
-    const result = await res.json();
-    await fetchAll();
-    return result;
-  }, [fetchAll]);
-
-  const fetchFilteredHistory = useCallback(async (filters) => {
-    console.log('[API] Fetching Filtered History:', filters);
-    const params = new URLSearchParams();
-    if (filters.date) params.append('date', filters.date);
-    if (filters.master && filters.master !== 'All Products') params.append('master', filters.master);
-    if (filters.status && filters.status !== 'All Statuses') params.append('status', filters.status);
-    if (filters.triggerType && filters.triggerType !== 'All Types') params.append('triggerType', filters.triggerType);
-    
-    try {
-      const res = await fetch(`${API_URL}/run-history?${params.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        setRunHistory(data.map(normalizeRunHistory));
-        addNotification({ title: 'Data Refreshed', message: 'Execution logs updated from server.' });
-      } else {
-        console.error('[API] History Fetch Error:', res.status);
-      }
-    } catch (err) {
-      console.error('[API] History Fetch Network Error:', err);
-    }
-  }, [normalizeRunHistory, addNotification]);
-
-  const fetchFilteredExceptions = useCallback(async (filters) => {
-    console.log('[API] Fetching Filtered Exceptions:', filters);
-    const params = new URLSearchParams();
-    if (filters.runId) params.append('runId', filters.runId);
-    if (filters.date) params.append('date', filters.date);
-    if (filters.master && filters.master !== 'All Products') params.append('master', filters.master);
-    if (filters.type && filters.type !== 'All Types') params.append('type', filters.type);
-    if (filters.priority && filters.priority !== 'All Priorities') params.append('priority', filters.priority);
-    if (filters.status && filters.status !== 'All Statuses') params.append('status', filters.status);
-    
-    try {
-      const res = await fetch(`${API_URL}/exceptions?${params.toString()}`);
-      if (res.ok) {
-        const data = await res.json();
-        setExceptions(data.map(normalizeException));
-        addNotification({ title: 'Queue Refreshed', message: 'Exception intelligence updated.' });
-      } else {
-        console.error('[API] Exception Fetch Error:', res.status);
-      }
-    } catch (err) {
-      console.error('[API] Exception Fetch Network Error:', err);
-    }
-  }, [normalizeException, addNotification]);
-
-  const resolveException = async (id) => {
-    const res = await fetch(`${API_URL}/exceptions/${id}`, { method: 'DELETE' });
-    if (res.ok) { fetchAll(); logAudit('Exception Resolved', 'Exception', `Transaction ${id} closed`, 'Operations'); return true; }
-    return false;
-  };
-  
-  const updateExceptionStatus = async (id, status, remarks) => {
-    const res = await fetch(`${API_URL}/exceptions/${id}`, { 
-      method: 'PUT', 
-      headers: { 'Content-Type': 'application/json' }, 
-      body: JSON.stringify({ status, remarks }) 
-    });
-    if (res.ok) { 
-      fetchAll(); 
-      logAudit('Exception Updated', 'Exception', `Transaction ${id} set to ${status} with remarks`, 'Operations'); 
-      return true; 
-    }
+    if (res.ok) { fetchAll(); return true; }
     return false;
   };
 
-  const fetchSuggestions = async (exceptionId) => {
-    const res = await fetch(`${API_URL}/suggestions/${exceptionId}`);
-    return res.ok ? await res.json() : [];
-  };
-
-  const markAllAsRead = async () => {
-    await fetch(`${API_URL}/notifications/read`, { method: 'PATCH' });
-    fetchAll();
-  };
-
-  const resetSystemData = async () => {
-    try {
-      const res = await fetch(`${API_URL}/admin/reset-data`, { method: 'POST' });
-      if (res.ok) {
-        const data = await res.json();
-        await fetchAll();
-        return data;
-      }
-      throw new Error('Server returned an error');
-    } catch (err) {
-      console.error('System reset failed:', err);
-      throw err;
-    }
-  };
-
-  const saveQueryConfig = async (config) => {
-    const res = await fetch(`${API_URL}/query-configs`, { 
-      method: 'POST', 
-      headers: { 'Content-Type': 'application/json' }, 
-      body: JSON.stringify({ ...config, created_by: user?.name || 'Admin' }) 
+  const saveQueryConfig = async (configData) => {
+    const res = await fetch(`${API_URL}/query-configs`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(configData)
     });
     if (res.ok) { fetchAll(); return true; }
     return false;
@@ -405,6 +341,30 @@ export const AppProvider = ({ children }) => {
     setUser(null);
     setActivePage('dashboard');
     window.location.reload();
+  };
+
+  const fetchSuggestions = async (exceptionId) => {
+    try {
+      const res = await fetch(`${API_URL}/ai-suggestions`);
+      const data = await res.json();
+      const normalized = Array.isArray(data) ? data.map(normalizeAiSuggestion) : [];
+      if (!exceptionId) setAiSuggestions(normalized);
+      return normalized;
+    } catch (e) {
+      console.error('Failed to fetch suggestions', e);
+      return [];
+    }
+  };
+
+  const markAllAsRead = async () => {
+    const res = await fetch(`${API_URL}/notifications/read-all`, { method: 'PUT' });
+    if (res.ok) fetchAll();
+  };
+
+  const resetSystemData = async () => {
+    const res = await fetch(`${API_URL}/system/reset`, { method: 'POST' });
+    const data = await res.json();
+    return data;
   };
 
   return (

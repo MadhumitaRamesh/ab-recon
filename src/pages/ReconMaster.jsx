@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
-import { Plus, Database, Settings2, FileCode, Edit3, Trash2, X, Info, Layers, Zap, Globe, Server, UserCheck } from 'lucide-react';
+import { Plus, Database, Settings2, Edit3, Trash2, X, Info, Layers, Zap, Globe, Server, UserCheck } from 'lucide-react';
 
 const ReconMaster = () => {
-  const { masters, addMaster, updateMaster, deleteMaster, addNotification } = useApp();
+  const { masters, addMaster, updateMaster, deleteMaster, addNotification, searchQuery } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingMaster, setEditingMaster] = useState(null);
   
@@ -36,10 +36,12 @@ const ReconMaster = () => {
   };
 
   const updateSourceField = (id, field, value) => {
-    const newConfig = formData.source_config.map(c => 
-      c.id === id ? { ...c, [field]: value } : c
-    );
-    setFormData({ ...formData, source_config: newConfig });
+    setFormData(prev => {
+      const newConfig = prev.source_config.map(c => 
+        c.id === id ? { ...c, [field]: value } : c
+      );
+      return { ...prev, source_config: newConfig };
+    });
   };
 
   const handleSave = async (e) => {
@@ -67,6 +69,10 @@ const ReconMaster = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const filteredMasters = (masters || []).filter(m => 
+    !searchQuery || m.name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="main-content">
       <div style={{ marginBottom: '32px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '16px' }}>
@@ -82,7 +88,7 @@ const ReconMaster = () => {
       </div>
 
       {showForm && (
-        <div className="card animate-reveal" style={{ borderTop: '4px solid var(--primary)', marginBottom: '40px' }}>
+        <div className="card" style={{ borderTop: '4px solid var(--primary)', marginBottom: '40px' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '32px' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               <div style={{ padding: '8px', background: 'var(--primary-light)', borderRadius: '8px' }}>
@@ -130,7 +136,7 @@ const ReconMaster = () => {
               </h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '20px' }}>
                 {formData.source_config.map((source) => (
-                  <div key={source.id} style={{ padding: '24px', background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0', transition: 'all 0.3s ease' }}>
+                  <div key={source.id} style={{ padding: '24px', background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
                       <div style={{ fontWeight: '900', fontSize: '12px', color: 'var(--primary)', letterSpacing: '1px' }}>SOURCE {source.id}</div>
                       <div style={{ padding: '6px', background: 'white', borderRadius: '8px', border: '1px solid #E2E8F0' }}>
@@ -156,15 +162,15 @@ const ReconMaster = () => {
                         value={source.type} 
                         onChange={(e) => updateSourceField(source.id, 'type', e.target.value)}
                       >
-                        <option>Manual Upload</option>
-                        <option>Automatic</option>
-                        <option>API-Based</option>
+                        <option value="Manual Upload">Manual Upload</option>
+                        <option value="Automatic">Automatic</option>
+                        <option value="API-Based">API-Based</option>
                       </select>
                     </div>
 
                     {/* Conditional Fields */}
                     {source.type === 'Automatic' && (
-                      <div className="form-group animate-reveal">
+                      <div className="form-group" style={{ marginTop: '16px' }}>
                         <label style={{ fontSize: '12px', color: '#D97706', fontWeight: '800', marginBottom: '8px', display: 'block' }}>Internal Dataset / Table Name</label>
                         <input 
                           type="text" 
@@ -172,14 +178,14 @@ const ReconMaster = () => {
                           value={source.tableName || ''} 
                           onChange={(e) => updateSourceField(source.id, 'tableName', e.target.value)}
                           placeholder="e.g. gl_transactions"
-                          style={{ borderColor: '#FDE68A', background: '#FFFBEB' }}
+                          style={{ borderColor: '#FDE68A', background: '#FFFBEB', fontSize: '13px' }}
                           required
                         />
                       </div>
                     )}
 
                     {source.type === 'API-Based' && (
-                      <div className="animate-reveal">
+                      <div style={{ marginTop: '16px', display: 'grid', gap: '16px' }}>
                         <div className="form-group">
                           <label style={{ fontSize: '12px', color: '#0284C7', fontWeight: '800', marginBottom: '8px', display: 'block' }}>API Endpoint URL</label>
                           <input 
@@ -188,7 +194,7 @@ const ReconMaster = () => {
                             value={source.apiUrl || ''} 
                             onChange={(e) => updateSourceField(source.id, 'apiUrl', e.target.value)}
                             placeholder="e.g. https://api.example.com/transactions"
-                            style={{ borderColor: '#BAE6FD', background: '#F0F9FF' }}
+                            style={{ borderColor: '#BAE6FD', background: '#F0F9FF', fontSize: '13px' }}
                             required
                           />
                         </div>
@@ -200,7 +206,7 @@ const ReconMaster = () => {
                             value={source.apiKey || ''} 
                             onChange={(e) => updateSourceField(source.id, 'apiKey', e.target.value)}
                             placeholder="Enter API key"
-                            style={{ borderColor: '#BAE6FD', background: '#F0F9FF' }}
+                            style={{ borderColor: '#BAE6FD', background: '#F0F9FF', fontSize: '13px' }}
                             required
                           />
                         </div>
@@ -235,7 +241,7 @@ const ReconMaster = () => {
               </tr>
             </thead>
             <tbody>
-              {masters.map(m => (
+              {filteredMasters.map(m => (
                 <tr key={m.id} className="hover-scale">
                   <td>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -273,11 +279,6 @@ const ReconMaster = () => {
             </tbody>
           </table>
         </div>
-      </div>
-
-      <div className="card" style={{ marginTop: '32px', padding: '24px', background: '#F0F9FF', border: '1px solid #BAE6FD', display: 'flex', gap: '20px', alignItems: 'center' }}>
-        <Info size={24} color="#0284C7" />
-        <p style={{ fontSize: '14px', color: '#0369A1', fontWeight: '600' }}>Master configurations directly dictate the ingestion workflow. Changing the matching logic will automatically update the number of required data sources in the 'Run Reconciliation' module.</p>
       </div>
     </div>
   );

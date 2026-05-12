@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import { 
   TrendingUp, 
@@ -21,7 +21,7 @@ const getLocalDate = () => {
 };
 
 const Dashboard = () => {
-  const { setActivePage, addNotification, fetchFilteredHistory, runHistory, exceptions, masters } = useApp();
+  const { setActivePage, addNotification, fetchFilteredHistory, fetchFilteredExceptions, runHistory, exceptions, masters } = useApp();
   const [isSyncing, setIsSyncing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(getLocalDate());
 
@@ -74,17 +74,18 @@ const Dashboard = () => {
   const summary = useMemo(() => {
     const map = {};
     dailyRuns.forEach(run => {
-      if (!map[run.product]) {
-        map[run.product] = { product: run.product, totalMatched: 0, totalExceptions: 0, runs: 0, statuses: [] };
+      const productName = run.product || 'Unknown Product';
+      if (!map[productName]) {
+        map[productName] = { product: productName, totalMatched: 0, totalExceptions: 0, runs: 0, statuses: [] };
       }
-      map[run.product].totalMatched += typeof run.matched === 'string'
+      map[productName].totalMatched += typeof run.matched === 'string'
         ? parseInt(run.matched.replace(/,/g, '')) || 0
         : (run.matched || 0);
-      map[run.product].totalExceptions += typeof run.exceptions === 'string'
+      map[productName].totalExceptions += typeof run.exceptions === 'string'
         ? parseInt(run.exceptions.replace(/,/g, '')) || 0
         : (run.exceptions || 0);
-      map[run.product].runs += 1;
-      map[run.product].statuses.push(run.status);
+      map[productName].runs += 1;
+      map[productName].statuses.push(run.status);
     });
     return Object.values(map);
   }, [dailyRuns]);
@@ -92,12 +93,18 @@ const Dashboard = () => {
   const handleDateChange = async (e) => {
     const date = e.target.value;
     setSelectedDate(date);
-    await fetchFilteredHistory({ date });
+    await Promise.all([
+      fetchFilteredHistory({ date }),
+      fetchFilteredExceptions({ date })
+    ]);
   };
 
   const handleManualSync = async () => {
     setIsSyncing(true);
-    await fetchFilteredHistory({ date: selectedDate });
+    await Promise.all([
+      fetchFilteredHistory({ date: selectedDate }),
+      fetchFilteredExceptions({ date: selectedDate })
+    ]);
     setTimeout(() => {
       setIsSyncing(false);
       addNotification({ title: 'Dashboard Refreshed', message: `Loaded latest reconciliation data for ${selectedDate}.` });

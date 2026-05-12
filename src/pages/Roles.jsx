@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Shield, Plus, Edit3, Trash2, CheckCircle, X, Save, ShieldAlert } from 'lucide-react';
 
 const Roles = () => {
-  const { roles, setRoles, addRole, updateRole, deleteRole, addNotification } = useApp();
+  const { roles, setRoles, addRole, updateRole, deleteRole, addNotification, searchQuery } = useApp();
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [isLoaded, setIsLoaded] = useState(false);
@@ -60,6 +60,10 @@ const Roles = () => {
     }
   };
 
+  const filteredRoles = roles.filter(role => 
+    !searchQuery || role.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className={`main-content ${isLoaded ? 'animate-reveal' : ''}`} style={{ opacity: isLoaded ? 1 : 0 }}>
       <div style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px' }}>
@@ -73,7 +77,7 @@ const Roles = () => {
       </div>
 
       <div className="grid-4" style={{ marginBottom: '40px' }}>
-        {roles.map((role) => (
+        {filteredRoles.map((role) => (
           <div key={role.id} className="card hover-scale" style={{ padding: '32px', marginBottom: 0, borderTop: `4px solid ${role.name === 'Admin' ? 'var(--primary)' : 'var(--gold)'}` }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '20px' }}>
               <div style={{ background: '#F8FAFC', padding: '12px', borderRadius: '12px' }}>

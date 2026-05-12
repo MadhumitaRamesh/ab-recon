@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 
 const QueryConfig = () => {
-  const { queryConfigs, saveQueryConfig, deleteQueryConfig, masters, addNotification, user } = useApp();
+  const { queryConfigs, saveQueryConfig, deleteQueryConfig, masters, addNotification, user, searchQuery } = useApp();
   const [showModal, setShowModal] = useState(false);
   const [editingConfig, setEditingConfig] = useState(null);
   
@@ -67,6 +67,17 @@ const QueryConfig = () => {
     }
   };
 
+  const filteredConfigs = (queryConfigs || []).filter(config => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    const master = masters.find(m => m.id === config.recon_master_id);
+    return (
+      master?.name?.toLowerCase().includes(q) ||
+      config.source_label?.toLowerCase().includes(q) ||
+      config.custom_query_template?.toLowerCase().includes(q)
+    );
+  });
+
   if (!isAdmin) {
     return (
       <div className="main-content" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '80vh' }}>
@@ -106,13 +117,13 @@ const QueryConfig = () => {
             </tr>
           </thead>
           <tbody>
-            {queryConfigs.length === 0 ? (
+            {filteredConfigs.length === 0 ? (
               <tr>
                 <td colSpan={5} style={{ textAlign: 'center', padding: '48px', color: '#94A3B8' }}>
                   No custom query configurations found.
                 </td>
               </tr>
-            ) : queryConfigs.map(config => {
+            ) : filteredConfigs.map(config => {
               const master = masters.find(m => m.id === config.recon_master_id);
               return (
                 <tr key={config.id}>

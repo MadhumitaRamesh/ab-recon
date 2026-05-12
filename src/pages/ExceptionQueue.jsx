@@ -154,7 +154,7 @@ const ExceptionQueue = () => {
   };
 
   const handleAcceptMatch = async (candidate) => {
-    const success = await resolveException(selectedEx.id);
+    const success = await resolveException(selectedEx.id, 'Resolved via AI Match Assistant');
     if (success) {
       addNotification({ title: 'Match Confirmed & Closed', message: `Transaction ${selectedEx.id} matched with ${candidate.candidateId}.` });
       setSelectedEx(null);
@@ -208,7 +208,7 @@ const ExceptionQueue = () => {
             <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#64748B', marginBottom: '5px', textTransform: 'uppercase' }}>Recon Product</label>
             <select className="form-control" value={filterProduct} onChange={(e) => setFilterProduct(e.target.value)} style={{ height: '38px', fontSize: '13px' }}>
               <option value="All Products">All Products</option>
-              {masters.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+              {Array.isArray(masters) && masters.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
             </select>
           </div>
           {/* Type */}
@@ -406,7 +406,7 @@ const ExceptionQueue = () => {
                 <div style={{ padding: '32px', textAlign: 'center', color: '#94A3B8' }}>
                   <RefreshCw size={20} className="animate-spin" style={{ margin: '0 auto' }} />
                 </div>
-              ) : suggestions.length > 0 ? (
+              ) : (Array.isArray(suggestions) && suggestions.length > 0) ? (
                 suggestions.map(sug => (
                   <div key={sug.candidateId} style={{ padding: '14px', borderRadius: '10px', border: '1px solid #E2E8F0' }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>

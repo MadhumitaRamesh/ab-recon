@@ -115,31 +115,21 @@ const RunRecon = () => {
   }, [isRunning, stepIndex, selectedMaster]);
 
   const finalizeRun = async () => {
-    console.log('[DEBUG] Finalizing run for date:', runDate);
     try {
       const result = await triggerReconRun(selectedMaster.id, runDate, selectedMaster.run_mode || 'Manual', fileSelections);
-      console.log('[DEBUG] Run result:', result);
       
-      // Sync the history filter date to the run date so the new entry is immediately visible
       setFilterDate(runDate);
       setFilterProduct('All Products');
       setFilterStatus('All Statuses');
       setFilterTrigger('All Types');
       
-      // Also explicitly refresh with matching filters
-      await fetchFilteredHistory({ date: runDate });
-      
       addNotification({ 
         title: 'Recon Success', 
-        message: `${selectedMaster?.name} cycle [${result.runId}] completed. ${result.exceptionCount} exception(s) logged.` 
+        message: `${selectedMaster?.name} cycle completed. ${result.exceptionCount} exception(s) logged.` 
       });
     } catch (e) {
-      console.error('[DEBUG] Execution update failed', e);
       addNotification({ title: 'Recon Failed', message: `Execution error: ${e.message}`, type: 'error' });
-      
-      // On failure, still refresh so any partial data (failed run record) shows
       setFilterDate(runDate);
-      await fetchFilteredHistory({ date: runDate });
     }
     
     setIsRunning(false);
@@ -162,7 +152,6 @@ const RunRecon = () => {
 
   const handleViewAudit = (runId) => {
     setActivePage('audit');
-    // In a real app, we'd also filter the audit log
   };
 
   const filteredHistory = (runHistory || []).filter(run => {
@@ -207,7 +196,6 @@ const RunRecon = () => {
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '48px' }}>
-        {/* EXECUTION PANEL */}
         <div className="card" style={{ padding: '32px', display: 'flex', flexDirection: 'column', borderTop: '4px solid var(--primary)', background: 'white' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '32px' }}>
             <div style={{ padding: '8px', background: 'rgba(123, 17, 19, 0.05)', borderRadius: '10px' }}>
@@ -273,19 +261,23 @@ const RunRecon = () => {
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: '#FFFBEB', borderRadius: '12px', border: '1px solid #FDE68A' }}>
                         <Database size={20} color="#D97706" />
                         <div>
-                          <div style={{ fontSize: '13px', fontWeight: '800', color: '#92400E' }}>Automatic Ingestion</div>
-                          <div style={{ fontSize: '11px', color: '#B45309' }}>Table: <strong>{source.tableName || 'N/A'}</strong></div>
+                          <div style={{ fontSize: '13px', fontWeight: '800', color: '#92400E' }}>Automatic Fetch</div>
+                          <div style={{ fontSize: '11px', color: '#B45309', lineHeight: '1.4' }}>
+                            {source.name} will be fetched automatically from internal dataset: <strong>{source.tableName || 'N/A'}</strong>
+                          </div>
                         </div>
                       </div>
-                    ) : (
+                    ) : source.type === 'API-Based' ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: '#F0F9FF', borderRadius: '12px', border: '1px solid #BAE6FD' }}>
                         <Globe size={20} color="#0284C7" />
                         <div>
-                          <div style={{ fontSize: '13px', fontWeight: '800', color: '#075985' }}>API Bridge</div>
-                          <div style={{ fontSize: '11px', color: '#0369A1', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{source.apiUrl || 'N/A'}</div>
+                          <div style={{ fontSize: '13px', fontWeight: '800', color: '#075985' }}>API Connection</div>
+                          <div style={{ fontSize: '11px', color: '#0369A1', lineHeight: '1.4' }}>
+                            {source.name} will be fetched automatically via API: <strong style={{ wordBreak: 'break-all' }}>{source.apiUrl || 'N/A'}</strong>
+                          </div>
                         </div>
                       </div>
-                    )}
+                    ) : null}
                   </div>
                 ))}
               </div>
@@ -313,7 +305,6 @@ const RunRecon = () => {
           </button>
         </div>
 
-        {/* TERMINAL PANEL */}
         <div style={{ 
           background: '#0F172A', 
           borderRadius: '24px', 
@@ -360,7 +351,6 @@ const RunRecon = () => {
         </div>
       </div>
 
-      {/* HISTORY TABLE */}
       <div className="card" style={{ padding: '0', overflow: 'hidden', background: 'white' }}>
         <div style={{ padding: '24px 32px', borderBottom: '1px solid #F1F5F9' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
@@ -416,8 +406,7 @@ const RunRecon = () => {
               >
                 <option value="All Types">All Types</option>
                 <option value="Manual">Manual</option>
-                <option value="Cron">Cron</option>
-                <option value="API">API</option>
+                <option value="Scheduled">Scheduled</option>
               </select>
             </div>
             <div style={{ flex: '0.5' }}>
@@ -452,6 +441,7 @@ const RunRecon = () => {
                 <th>Exceptions</th>
                 <th>Start Time</th>
                 <th>End Time</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -493,7 +483,7 @@ const RunRecon = () => {
               ))}
               {filteredHistory.length === 0 && (
                 <tr>
-                  <td colSpan="9" style={{ textAlign: 'center', padding: '40px', color: '#94A3B8' }}>No execution records found for the current filter.</td>
+                  <td colSpan="10" style={{ textAlign: 'center', padding: '40px', color: '#94A3B8' }}>No execution records found for the current filter.</td>
                 </tr>
               )}
             </tbody>

@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Bell, LogOut, Search, User, Menu, X, CheckCircle, Shield } from 'lucide-react';
 
 const Navbar = () => {
-  const { user, logout, searchQuery, setSearchQuery, notifications, markAllAsRead, sidebarOpen, setSidebarOpen } = useApp();
+  const { user, logout, searchQuery, setSearchQuery, notifications, markAllAsRead, sidebarOpen, setSidebarOpen, activePage } = useApp();
   const [showNotifs, setShowNotifs] = useState(false);
 
   const unreadCount = notifications.filter(n => !n.read).length;
@@ -47,20 +47,32 @@ const Navbar = () => {
           <Menu size={24} />
         </button>
 
-        <div className="header-search" style={{ position: 'relative', width: '100%', maxWidth: '300px' }}>
-          <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: '#94A3B8' }} />
+        <div className="header-search" style={{ position: 'relative', width: '100%', maxWidth: '350px' }}>
+          <Search size={16} style={{ position: 'absolute', left: '12px', top: '12px', color: '#94A3B8' }} />
           <input 
             type="text" 
-            placeholder="Search transactions..."
+            placeholder={
+              activePage === 'exceptions' ? "Search by ID, Ref, or Product..." :
+              activePage === 'runs' ? "Search Batch ID or Product..." :
+              activePage === 'users' ? "Search Name or Employee ID..." :
+              activePage === 'masters' ? "Search Config Name..." :
+              activePage === 'audit' ? "Search Action, User, or Detail..." :
+              activePage === 'roles' ? "Search Role Name..." :
+              activePage === 'query-config' ? "Search Source or Query..." :
+              "Search platform..."
+            }
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             style={{ 
               width: '100%', 
-              padding: '8px 12px 8px 38px', 
-              borderRadius: '6px', 
+              padding: '10px 12px 10px 38px', 
+              borderRadius: '8px', 
               border: '1px solid #E2E8F0',
               fontSize: '13px',
-              background: '#F8FAFC'
+              background: '#F8FAFC',
+              outline: 'none',
+              transition: 'all 0.2s ease',
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.02)'
             }}
           />
         </div>

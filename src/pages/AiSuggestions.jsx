@@ -3,7 +3,7 @@ import { useApp } from '../context/AppContext';
 import { Zap, CheckCircle2, MessageSquare, Sparkles, Send, ShieldCheck, X } from 'lucide-react';
 
 const AiSuggestions = () => {
-  const { addNotification, aiSuggestions, setAiSuggestions } = useApp();
+  const { addNotification, aiSuggestions, setAiSuggestions, searchQuery } = useApp();
   const [chatMessages, setChatMessages] = useState([
     { role: 'ai', text: 'Hello! I am your ABC Reconciliation Co-Pilot. I have identified 3 new anomaly patterns today in the BBPS and UPI modules. How can I help you resolve them?' }
   ]);
@@ -59,6 +59,13 @@ const AiSuggestions = () => {
     }, 1000);
   };
 
+  const filteredSuggestions = aiSuggestions.filter(s => 
+    !searchQuery || 
+    s.id?.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    s.detail?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    s.type?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="main-content animate-fade-in">
       <div style={{ marginBottom: '40px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px' }}>
@@ -77,7 +84,7 @@ const AiSuggestions = () => {
       <div className="grid-2-1">
         <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
           <h3 style={{ fontSize: '18px', color: '#1E293B', fontWeight: '800' }}>Intelligent Insights</h3>
-          {aiSuggestions.map(s => (
+          {filteredSuggestions.map(s => (
             <div key={s.id} className="card hover-scale" style={{ borderLeft: `6px solid ${s.confidence > 90 ? '#059669' : 'var(--gold)'}`, padding: '32px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -101,7 +108,7 @@ const AiSuggestions = () => {
               </div>
             </div>
           ))}
-          {aiSuggestions.length === 0 && (
+          {filteredSuggestions.length === 0 && (
             <div className="card" style={{ textAlign: 'center', padding: '80px 40px' }}>
               <CheckCircle2 size={56} color="#059669" style={{ marginBottom: '24px', opacity: 0.4 }} />
               <h3 style={{ fontSize: '20px' }}>All Insights Resolved</h3>
