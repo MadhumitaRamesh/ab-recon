@@ -12,6 +12,7 @@ import RunRecon from './pages/RunRecon';
 import AiSuggestions from './pages/AiSuggestions';
 import Reports from './pages/Reports';
 import QueryConfig from './pages/QueryConfig';
+import ReconciliationTransactions from './pages/ReconciliationTransactions';
 import Sidebar from './components/Sidebar';
 import Navbar from './components/Navbar';
 
@@ -61,6 +62,7 @@ function App() {
       case 'masters': return <ReconMaster />;
       case 'runs': return <RunRecon />;
       case 'exceptions': return <ExceptionQueue />;
+      case 'transactions': return <ReconciliationTransactions />;
       case 'suggestions': return <AiSuggestions />;
       case 'reports': return <Reports />;
       case 'audit': return <AuditLog />;

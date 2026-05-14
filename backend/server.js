@@ -663,6 +663,140 @@ app.post('/api/admin/reset-data', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 5001;
-app.listen(PORT, () => {
-    console.log(`Backend Server running on port ${PORT}`);
+// --- RECON TRANSACTIONS (3-Level Hierarchical Module) ---
+app.get('/api/recon-transactions', (req, res) => {
+    const { masterId, status, startDate, endDate } = req.query;
+    if (!masterId) return res.status(400).json({ error: 'Master ID is required.' });
+
+    db.query('SELECT name FROM masters WHERE id = ?', [masterId], (err, masterResults) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (masterResults.length === 0) return res.status(404).json({ error: 'Master not found.' });
+        
+        const productName = masterResults[0].name;
+        let sql = `
+            SELECT 
+                id AS batch_id,
+                run_date,
+                product,
+                status,
+                matched_count,
+                exception_count,
+                CASE 
+                    WHEN status = 'Completed' THEN 'Settled'
+                    WHEN status = 'Failed' THEN 'Unsettled'
+                    WHEN status = 'In Progress' THEN 'Pending'
+                    ELSE 'Pending'
+                END AS settlement_status
+            FROM run_history
+            WHERE product = ?
+        `;
+        let params = [productName];
+        
+        if (startDate) {
+            sql += " AND run_date >= ?";
+            params.push(startDate);
+        }
+        if (endDate) {
+            sql += " AND run_date <= ?";
+            params.push(endDate);
+        }
+        
+        if (status && status !== 'All') {
+            if (status === 'Closed') sql += " AND status = 'Completed'";
+            else if (status === 'Open') sql += " AND status = 'In Progress'";
+            else if (status === 'Pending') sql += " AND status = 'Failed'";
+        }
+        
+        sql += ' ORDER BY run_date DESC, run_time DESC';
+        
+        db.query(sql, params, (err, results) => {
+            if (err) return res.status(500).json({ error: err.message });
+            
+            const mapped = results.map(r => ({
+                ...r,
+                transaction_date: r.run_date,
+                recon_id: r.batch_id,
+                transaction_amount: r.matched_count,
+                claim_amount: Number(r.matched_count) + Number(r.exception_count),
+                refund_amount: 0,
+                snr_amount: r.exception_count,
+                recon_status: r.status
+            }));
+            res.json(mapped);
+        });
+    });
+});
+
+app.get('/api/recon-transactions/:batchId/overview', (req, res) => {
+    const { batchId } = req.params;
+    const sql = `
+        SELECT r.*, m.source_config, m.name AS master_name 
+        FROM run_history r
+        LEFT JOIN masters m ON r.product = m.name
+        WHERE r.id = ?
+    `;
+    db.query(sql, [batchId], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (results.length === 0) return res.status(404).json({ error: 'Batch not found' });
+        
+        const r = results[0];
+        let parsedConfig = [];
+        try {
+            parsedConfig = typeof r.source_config === 'string' ? JSON.parse(r.source_config) : (r.source_config || []);
+        } catch (e) {
+            console.error('[API] Source Config Parse Error:', e.message);
+        }
+
+        res.json({
+            batch_id: r.id,
+            run_date: r.run_date,
+            total_processed: Number(r.matched_count) + Number(r.exception_count),
+            matched_count: r.matched_count,
+            exception_count: r.exception_count,
+            source_config: parsedConfig
+        });
+    });
+});
+
+app.get('/api/recon-transactions/:batchId/summary', (req, res) => {
+    const { batchId } = req.params;
+    db.query('SELECT matched_count, exception_count FROM run_history WHERE id = ?', [batchId], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (results.length === 0) return res.status(404).json({ error: 'Batch not found' });
+        res.json(results[0]);
+    });
+});
+
+app.get('/api/recon-transactions/:batchId/refund', (req, res) => {
+    const { batchId } = req.params;
+    db.query('SELECT ref_no, amount, status FROM exceptions WHERE run_id = ? AND type = "Reversal"', [batchId], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+app.get('/api/recon-transactions/:batchId/transactions', (req, res) => {
+    const { batchId } = req.params;
+    const sql = `
+        SELECT e.*, m.name AS master_name 
+        FROM exceptions e
+        LEFT JOIN masters m ON e.recon_master_id = m.id
+        WHERE e.run_id = ?
+    `;
+    db.query(sql, [batchId], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+app.get('/api/recon-transactions/:batchId/snr', (req, res) => {
+    const { batchId } = req.params;
+    db.query('SELECT id, amount, ref_no, type FROM exceptions WHERE run_id = ? AND status IN ("Pending", "Under Review")', [batchId], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+app.listen(5001, () => {
+    console.log('ABC Recon Backend running on http://127.0.0.1:5001');
 });

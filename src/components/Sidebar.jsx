@@ -24,6 +24,7 @@ const Sidebar = () => {
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, moduleName: 'Dashboard' },
     { id: 'masters', label: 'Recon Masters', icon: Settings, moduleName: 'Recon Masters' },
     { id: 'runs', label: 'Run Recon', icon: RefreshCcw, moduleName: 'Run Recon' },
+    { id: 'transactions', label: 'Recon Transactions', icon: History, moduleName: 'Recon Transactions' },
     { id: 'exceptions', label: 'Exception Queue', icon: AlertTriangle, moduleName: 'Exception Queue' },
     { id: 'suggestions', label: 'AI Suggestions', icon: Zap, moduleName: 'AI Suggestions' },
     { id: 'reports', label: 'Reports', icon: FileText, moduleName: 'Reports' },

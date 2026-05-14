@@ -115,14 +115,20 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
         const sourceB = sourceIds.length >= 2 ? sourceData[sourceIds[1]] : [];
         
         let matchedCount = 0;
+        let matchedAmount = 0;
         let exceptionCount = 0;
+        let exceptionAmount = 0;
+        let refundAmount = 0;
+        let snrAmount = 0;
         const exceptions = [];
 
-        const exceptionTypes = ['Amount Mismatch', 'Missing Entry', 'Duplicate Reference'];
+        const exceptionTypes = ['Amount Mismatch', 'Missing Entry', 'Duplicate Reference', 'Refund Mismatch', 'Variance'];
         const priorities = ['High', 'Medium', 'Low'];
 
         const bMap = new Map();
+        let totalClaimAmount = 0;
         sourceB.forEach(txn => {
+            totalClaimAmount += parseFloat(txn.amount) || 0;
             const key = `${txn.amount}|${txn.reference_number}`;
             if (!bMap.has(key)) bMap.set(key, []);
             bMap.get(key).push(txn);
@@ -133,11 +139,19 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
             const matches = bMap.get(key);
             if (matches && matches.length > 0) {
                 matchedCount++;
+                matchedAmount += parseFloat(txnA.amount) || 0;
                 matches.shift();
             } else {
                 const exType = exceptionTypes[Math.floor(Math.random() * exceptionTypes.length)];
                 const priority = priorities[Math.floor(Math.random() * priorities.length)];
+                const amt = parseFloat(txnA.amount) || 0;
+                
                 exceptionCount++;
+                exceptionAmount += amt;
+                
+                if (exType === 'Refund Mismatch') refundAmount += amt;
+                if (['Missing Entry', 'Variance'].includes(exType)) snrAmount += amt;
+
                 exceptions.push({
                     id: `EX-${runId}-${exceptions.length + 1}`,
                     amount: txnA.amount,
@@ -161,7 +175,12 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
             remaining.forEach(txnB => {
                 const exType = 'Missing in Source A';
                 const priority = 'Medium';
+                const amt = parseFloat(txnB.amount) || 0;
+                
                 exceptionCount++;
+                exceptionAmount += amt;
+                snrAmount += amt;
+
                 exceptions.push({
                     id: `EX-${runId}-${exceptions.length + 1}`,
                     amount: txnB.amount,

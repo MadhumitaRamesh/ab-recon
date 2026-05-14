@@ -29,7 +29,7 @@ export const AppProvider = ({ children }) => {
   const activePage = activePageInternal;
 
   const modules = [
-    'Dashboard', 'Recon Masters', 'Run Recon', 'Exception Queue',
+    'Dashboard', 'Recon Masters', 'Run Recon', 'Exception Queue', 'Recon Transactions',
     'AI Suggestions', 'Reports', 'Query Config', 'Audit Log', 'Users', 'Roles', 'Permissions'
   ];
 
@@ -49,6 +49,8 @@ export const AppProvider = ({ children }) => {
     perms['Run Recon']['Ops_Maker'] = true;
     perms['Exception Queue']['Ops_Maker'] = true;
     perms['Exception Queue']['Ops_Checker'] = true;
+    perms['Recon Transactions']['Ops_Maker'] = true;
+    perms['Recon Transactions']['Ops_Checker'] = true;
     perms['AI Suggestions']['Ops_Maker'] = true;
     perms['AI Suggestions']['Ops_Checker'] = true;
     perms['Reports']['Ops_Maker'] = true;
@@ -73,7 +75,13 @@ export const AppProvider = ({ children }) => {
       status: r.status, matched: Number(r.matched_count).toLocaleString('en-IN'),
       exceptions: Number(r.exception_count).toLocaleString('en-IN'),
       startTime: r.start_time ? new Date(r.start_time).toLocaleTimeString() : '--',
-      endTime: r.end_time ? new Date(r.end_time).toLocaleTimeString() : '--'
+      endTime: r.end_time ? new Date(r.end_time).toLocaleTimeString() : '--',
+      matchedAmount: r.matched_amount || 0,
+      exceptionAmount: r.exception_amount || 0,
+      claimAmount: r.claim_amount || 0,
+      refundAmount: r.refund_amount || 0,
+      snrAmount: r.snr_amount || 0,
+      settlementStatus: r.settlement_status || 'Open'
     };
   }, []);
 
