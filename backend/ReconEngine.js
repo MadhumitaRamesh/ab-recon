@@ -1,29 +1,5 @@
 const db = require('./db');
-
-/**
- * Generates realistic synthetic transaction data for demonstration / manual-upload simulation.
- * This allows the engine to run even when actual file data is not provided.
- */
-function generateSyntheticData(sourceId, masterName, sharedPool = []) {
-    const data = [];
-    // Ensure 50 records per source
-    for (let i = 0; i < 50; i++) {
-        let record;
-        if (sharedPool.length > i && Math.random() > 0.3) {
-            // 70% chance to pick from shared pool (to create matches)
-            record = { ...sharedPool[i] };
-        } else {
-            record = {
-                amount: (Math.random() * 1000 + 100).toFixed(2),
-                reference_number: `TXN-${Math.floor(Math.random() * 90000) + 10000}`,
-                unique_reference_number: `UID-${Math.random().toString(36).substr(2, 9)}`
-            };
-            if (sharedPool.length < 50) sharedPool.push(record);
-        }
-        data.push(record);
-    }
-    return data;
-}
+const XLSX = require('xlsx');
 
 /**
  * Core Reconciliation Engine
@@ -33,235 +9,185 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
     const startTime = new Date();
     const runId = `RUN-${Math.floor(Math.random() * 89999) + 10000}`;
     
-    console.log(`[ENGINE] Starting dynamic reconciliation for ${masterConfig.name} (${runId})`);
+    console.log(`[ENGINE] Starting reconciliation for ${masterConfig.name} (${runId})`);
 
     const sources = masterConfig.source_config ? (typeof masterConfig.source_config === 'string' ? JSON.parse(masterConfig.source_config) : masterConfig.source_config) : [];
     const sourceData = {};
-    const sharedPool = []; // Used to create realistic matches between A and B
+    
+    let totalRowsRead = 0;
+    let fileName = manualData.fileName || 'Manual_Upload';
 
     try {
-        // 1. Dynamic Data Retrieval based on Configuration
+        // 1. Data Retrieval and Validation
         for (const source of sources) {
             const sourceType = (source.type || '').trim();
             const sourceLabel = source.name || source.id;
+            const mapping = source.mapping || { amount: 'amount', reference: 'reference_number' };
 
-            if (sourceType === 'Automatic' || sourceType === 'DB-Table' || sourceType === 'API-Based' || sourceType === 'External API') {
-                try {
-                    // Check for custom query config
-                    const [configs] = await db.promise().query(
-                        'SELECT * FROM recon_query_config WHERE recon_master_id = ? AND source_label = ?',
-                        [masterConfig.id, sourceLabel]
-                    );
-
-                    let rows;
-                    if (configs.length > 0) {
-                        const config = configs[0];
-                        let query = config.custom_query_template;
-                        
-                        // Handle placeholders
-                        query = query.replace(/{{date}}/g, runDate);
-                        query = query.replace(/{{product}}/g, masterConfig.name);
-                        
-                        // Handle time offsets if needed (calculate timestamps)
-                        const runDateObj = new Date(runDate);
-                        const startTimestamp = new Date(runDateObj.getTime() + (config.time_offset_minutes * 60000));
-                        const endTimestamp = new Date(runDateObj.getTime() + (24 * 60 * 60 * 1000) - 1000);
-                        
-                        query = query.replace(/{{start_timestamp}}/g, startTimestamp.toISOString().slice(0, 19).replace('T', ' '));
-                        query = query.replace(/{{end_timestamp}}/g, endTimestamp.toISOString().slice(0, 19).replace('T', ' '));
-
-                        console.log(`[ENGINE] Using custom query for ${sourceLabel}: ${query.substring(0, 100)}...`);
-                        [rows] = await db.promise().query(query);
-                    } else if (sourceType === 'Automatic' || sourceType === 'DB-Table') {
-                        [rows] = await db.promise().query(`SELECT * FROM ?? LIMIT 100`, [source.tableName]);
-                    }
-
-                    if (!rows || rows.length === 0) {
-                        console.log(`[ENGINE] No data found for ${sourceLabel}, using synthetic data.`);
-                        sourceData[source.id] = generateSyntheticData(source.id, masterConfig.name, sharedPool);
-                    } else {
-                        sourceData[source.id] = rows.map(r => ({
-                            amount: r.amount,
-                            reference_number: r.reference_number || r.ref_no,
-                            unique_reference_number: r.unique_reference_number || r.id
-                        }));
-                    }
-                } catch (err) {
-                    console.warn(`[ENGINE] Source [${sourceLabel}] retrieval failed: ${err.message}. Using synthetic data.`);
-                    sourceData[source.id] = generateSyntheticData(source.id, masterConfig.name, sharedPool);
+            if (sourceType === 'Manual Upload') {
+                const provided = manualData[source.id]; // Expecting Array of Objects
+                if (!provided || provided.length === 0) {
+                    throw new Error(`Data missing for source: ${sourceLabel}`);
                 }
-            } else if (sourceType === 'Manual Upload') {
-                const provided = manualData[source.id];
-                sourceData[source.id] = (provided && provided.length > 0)
-                    ? provided
-                    : generateSyntheticData(source.id, masterConfig.name, sharedPool);
+
+                // Header Validation
+                const firstRow = provided[0];
+                const hasAmt = mapping.amount in firstRow;
+                const hasRef = mapping.reference in firstRow;
+
+                if (!hasAmt || !hasRef) {
+                    throw new Error(`Column Mapping Error in ${sourceLabel}: Expected headers [${mapping.amount}, ${mapping.reference}] not found in file.`);
+                }
+
+                sourceData[source.id] = provided.map(row => ({
+                    amount: parseFloat(row[mapping.amount]) || 0,
+                    reference_number: String(row[mapping.reference] || ''),
+                    transaction_date: row.transaction_date || runDate
+                }));
+                
+                totalRowsRead += provided.length;
+            } else if (sourceType === 'API-Based') {
+                // In a production environment, this would perform a real HTTP fetch using source.apiUrl and source.apiKey
+                // For this implementation, we simulate receiving data (or using provided data if it exists)
+                const apiResponse = manualData[source.id] || []; 
+                const apiMapping = source.apiMapping || [];
+
+                sourceData[source.id] = apiResponse.map(item => {
+                    const mappedItem = {};
+                    if (apiMapping.length > 0) {
+                        apiMapping.forEach(m => {
+                            if (m.apiField && m.dbColumn) {
+                                mappedItem[m.dbColumn] = item[m.apiField];
+                            }
+                        });
+                    } else {
+                        // Fallback to raw response fields
+                        Object.assign(mappedItem, item);
+                    }
+
+                    // For the purpose of the internal recon engine, we still need to align to amount/reference
+                    // using the standard mapping defined in the Recon Master
+                    return {
+                        amount: parseFloat(mappedItem[mapping.amount] || item[mapping.amount]) || 0,
+                        reference_number: String(mappedItem[mapping.reference] || item[mapping.reference] || ''),
+                        transaction_date: mappedItem.transaction_date || item.transaction_date || runDate
+                    };
+                });
+                
+                totalRowsRead += apiResponse.length;
             } else {
-                // Defensive fallback: unknown or missing type — use synthetic data so the run doesn't fail
-                console.warn(`[ENGINE] Source ${source.id} (${source.name}) has unrecognised type '${sourceType}'. Defaulting to synthetic data.`);
-                sourceData[source.id] = generateSyntheticData(source.id, masterConfig.name, sharedPool);
+                // Defensive fallback for other types (can be expanded later)
+                sourceData[source.id] = []; 
             }
         }
 
-        // 2. Perform Matching Logic
         const sourceIds = Object.keys(sourceData);
-
-        // Need at least 1 source; if only 1, all records are exceptions
-        if (sourceIds.length === 0) {
-            throw new Error('No data sources found in the reconciliation master configuration.');
-        }
+        if (sourceIds.length < 1) throw new Error('Insufficient data sources.');
 
         const sourceA = sourceData[sourceIds[0]];
-        // For single-source masters, sourceB is empty (all sourceA records become exceptions)
         const sourceB = sourceIds.length >= 2 ? sourceData[sourceIds[1]] : [];
         
-        let matchedCount = 0;
-        let matchedAmount = 0;
-        let exceptionCount = 0;
-        let exceptionAmount = 0;
-        let refundAmount = 0;
-        let snrAmount = 0;
-        const exceptions = [];
-
-        const exceptionTypes = ['Amount Mismatch', 'Missing Entry', 'Duplicate Reference', 'Refund Mismatch', 'Variance'];
-        const priorities = ['High', 'Medium', 'Low'];
-
+        const results = [];
         const bMap = new Map();
-        let totalClaimAmount = 0;
+
         sourceB.forEach(txn => {
-            totalClaimAmount += parseFloat(txn.amount) || 0;
             const key = `${txn.amount}|${txn.reference_number}`;
             if (!bMap.has(key)) bMap.set(key, []);
             bMap.get(key).push(txn);
         });
 
+        let matchedCount = 0;
+        let exceptionCount = 0;
+
+        // Process Source A
         sourceA.forEach(txnA => {
             const key = `${txnA.amount}|${txnA.reference_number}`;
             const matches = bMap.get(key);
+
             if (matches && matches.length > 0) {
                 matchedCount++;
-                matchedAmount += parseFloat(txnA.amount) || 0;
+                results.push({
+                    run_id: runId,
+                    recon_master_id: masterConfig.id,
+                    amount: txnA.amount,
+                    reference_number: txnA.reference_number,
+                    result_type: 'Matched',
+                    transaction_date: txnA.transaction_date || runDate,
+                    status: 'Closed'
+                });
                 matches.shift();
             } else {
-                const exType = exceptionTypes[Math.floor(Math.random() * exceptionTypes.length)];
-                const priority = priorities[Math.floor(Math.random() * priorities.length)];
-                const amt = parseFloat(txnA.amount) || 0;
-                
                 exceptionCount++;
-                exceptionAmount += amt;
-                
-                if (exType === 'Refund Mismatch') refundAmount += amt;
-                if (['Missing Entry', 'Variance'].includes(exType)) snrAmount += amt;
-
-                exceptions.push({
-                    id: `EX-${runId}-${exceptions.length + 1}`,
-                    amount: txnA.amount,
-                    ref_no: txnA.reference_number,
-                    type: exType,
-                    age: '0 days',
-                    priority,
-                    status: 'Pending',
-                    recon_master_id: masterConfig.id,
+                results.push({
                     run_id: runId,
-                    run_date: runDate,
-                    source_type: 'System',
-                    unique_reference_number: txnA.unique_reference_number || 'N/A',
-                    assigned_role: 'Operations'
+                    recon_master_id: masterConfig.id,
+                    amount: txnA.amount,
+                    reference_number: txnA.reference_number,
+                    result_type: 'Exception',
+                    exception_type: 'Missing in Source B',
+                    transaction_date: txnA.transaction_date || runDate,
+                    status: 'Open'
                 });
             }
         });
 
-        // Also flag any unmatched records from sourceB
-        bMap.forEach((remaining) => {
+        // Flag leftovers in B
+        bMap.forEach(remaining => {
             remaining.forEach(txnB => {
-                const exType = 'Missing in Source A';
-                const priority = 'Medium';
-                const amt = parseFloat(txnB.amount) || 0;
-                
                 exceptionCount++;
-                exceptionAmount += amt;
-                snrAmount += amt;
-
-                exceptions.push({
-                    id: `EX-${runId}-${exceptions.length + 1}`,
-                    amount: txnB.amount,
-                    ref_no: txnB.reference_number,
-                    type: exType,
-                    age: '0 days',
-                    priority,
-                    status: 'Pending',
-                    recon_master_id: masterConfig.id,
+                results.push({
                     run_id: runId,
-                    run_date: runDate,
-                    source_type: 'System',
-                    unique_reference_number: txnB.unique_reference_number || 'N/A',
-                    assigned_role: 'Operations'
+                    recon_master_id: masterConfig.id,
+                    amount: txnB.amount,
+                    reference_number: txnB.reference_number,
+                    result_type: 'Exception',
+                    exception_type: 'Missing in Source A',
+                    transaction_date: txnB.transaction_date || runDate,
+                    status: 'Open'
                 });
             });
         });
 
-        // 3. Finalize Run — persist to DB atomically via Transaction
+        // 3. Finalize Run (Atomic Transaction)
         const endTime = new Date();
-        const runTimeStr = endTime.toLocaleTimeString('en-GB', { hour12: false });
-        const startTimeStr = startTime.toLocaleTimeString('en-GB', { hour12: false });
-
-        console.log(`[RECON_TRIGGER] Initiating atomic commit for Batch: ${runId} | Master: ${masterConfig.name} | Date: ${runDate} | Type: ${triggerType}`);
-
         const connection = await db.promise().getConnection();
         try {
             await connection.beginTransaction();
 
-            // Insert Run History
+            // History Audit Log
             await connection.query(
-                'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [runId, masterConfig.name, 'Completed', triggerType, matchedCount, exceptionCount, runDate, runTimeStr, startTimeStr, runTimeStr]
+                'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time, total_rows, valid_rows, file_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [runId, masterConfig.name, 'Completed', triggerType, matchedCount, exceptionCount, runDate, 
+                 endTime.toLocaleTimeString('en-GB', { hour12: false }), 
+                 startTime.toLocaleTimeString('en-GB', { hour12: false }), 
+                 endTime.toLocaleTimeString('en-GB', { hour12: false }), 
+                 totalRowsRead, results.length, fileName]
             );
 
-            // Insert Exceptions
-            if (exceptions.length > 0) {
-                const exValues = exceptions.map(e => [
-                    e.id, e.amount, e.ref_no, e.type, e.age, e.priority, e.status, 
-                    e.recon_master_id, e.run_id, e.run_date, e.source_type, e.unique_reference_number, e.assigned_role
+            // Detailed Results
+            if (results.length > 0) {
+                const values = results.map(r => [
+                    r.run_id, r.recon_master_id, r.reference_number, r.amount, 
+                    r.result_type, r.exception_type || null, r.status, r.transaction_date
                 ]);
                 await connection.query(
-                    'INSERT INTO exceptions (id, amount, ref_no, type, age, priority, status, recon_master_id, run_id, run_date, source_type, unique_reference_number, assigned_role) VALUES ?',
-                    [exValues]
+                    'INSERT INTO recon_results (run_id, recon_master_id, reference_number, amount, result_type, exception_type, status, transaction_date) VALUES ?',
+                    [values]
                 );
             }
 
-            // Insert Forensic Audit Log
-            await connection.query(
-                'INSERT INTO audit_logs (user_name, action, module, detail, log_time, log_date, type) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                ['SYSTEM', 'Recon Completed', 'Engine',
-                 `Cycle ${runId} for ${masterConfig.name} completed. Matched: ${matchedCount}, Exceptions: ${exceptionCount} | Trigger: ${triggerType}`,
-                 new Date().toLocaleTimeString('en-GB', { hour12: false }), runDate, 'System']
-            );
-
             await connection.commit();
-            console.log(`[RECON_SUCCESS] Batch ${runId} committed successfully. Trace: ${masterConfig.name} on ${runDate}`);
             return { success: true, runId, matchedCount, exceptionCount };
 
-        } catch (txnError) {
+        } catch (dbErr) {
             await connection.rollback();
-            throw txnError;
+            throw dbErr;
         } finally {
             connection.release();
         }
 
     } catch (error) {
-        console.error(`[RECON_ERROR] Batch ${runId} failed:`, error.message);
-
-        // Still write a failed run to history so it shows up in the UI (outside transaction)
-        try {
-            const runTimeStr = new Date().toLocaleTimeString('en-GB', { hour12: false });
-            const startTimeStr = startTime.toLocaleTimeString('en-GB', { hour12: false });
-            await db.promise().query(
-                'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [runId, masterConfig.name, 'Failed', triggerType, 0, 0, runDate, runTimeStr, startTimeStr, runTimeStr]
-            );
-        } catch (dbErr) {
-            console.error('[ENGINE] Could not write failed run to history:', dbErr.message);
-        }
-
+        console.error(`[ENGINE_ERROR] Batch ${runId} failed:`, error.message);
         throw error;
     }
 }

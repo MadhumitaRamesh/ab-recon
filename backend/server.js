@@ -4,6 +4,7 @@ const bcrypt = require('bcrypt');
 const cors = require('cors');
 const multer = require('multer');
 const path = require('path');
+const XLSX = require('xlsx');
 const fs = require('fs');
 require('dotenv').config();
 
@@ -465,12 +466,13 @@ app.post('/api/audit-logs', (req, res) => {
 
 // --- RUN HISTORY ---
 app.get('/api/run-history', async (req, res) => {
-    const { date, master, status, triggerType } = req.query;
-    console.log(`[API] Fetching History | Date: ${date} | Master: ${master} | Status: ${status}`);
+    const { startDate, endDate, date, master, status, triggerType } = req.query;
     try {
         let sql = 'SELECT * FROM run_history WHERE 1=1';
         const params = [];
-        if (date) { sql += ' AND run_date = ?'; params.push(date); }
+        if (startDate) { sql += ' AND run_date >= ?'; params.push(startDate); }
+        if (endDate) { sql += ' AND run_date <= ?'; params.push(endDate); }
+        if (date && !startDate) { sql += ' AND run_date = ?'; params.push(date); }
         if (master && master !== 'All Products') { sql += ' AND product = ?'; params.push(master); }
         if (status && status !== 'All Statuses') { sql += ' AND status = ?'; params.push(status); }
         if (triggerType && triggerType !== 'All Types') { sql += ' AND trigger_type = ?'; params.push(triggerType); }
@@ -480,6 +482,35 @@ app.get('/api/run-history', async (req, res) => {
         res.json(rows);
     } catch (err) {
         res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/recon-results/:runId', (req, res) => {
+    const { runId } = req.params;
+    const sql = 'SELECT * FROM recon_results WHERE run_id = ?';
+    db.query(sql, [runId], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        res.json(results);
+    });
+});
+
+const tempUpload = multer({ dest: 'uploads/temp/' });
+app.post('/api/recon/parse-file', tempUpload.single('file'), (req, res) => {
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+
+    try {
+        const workbook = XLSX.readFile(req.file.path);
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const data = XLSX.utils.sheet_to_json(worksheet);
+        fs.unlinkSync(req.file.path);
+        res.json({ 
+            headers: data.length > 0 ? Object.keys(data[0]) : [],
+            rows: data,
+            rowCount: data.length
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to parse file: ' + err.message });
     }
 });
 

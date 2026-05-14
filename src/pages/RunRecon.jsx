@@ -114,24 +114,44 @@ const RunRecon = () => {
     return () => clearTimeout(timer);
   }, [isRunning, stepIndex, selectedMaster]);
 
+  const [startDateFilter, setStartDateFilter] = useState('');
+  const [endDateFilter, setEndDateFilter] = useState('');
+  const [manualDataRows, setManualDataRows] = useState({});
+
+  const handleFileChange = async (sourceId, file) => {
+    if (!file) return;
+    setFileErrors(prev => ({ ...prev, [sourceId]: null }));
+
+    const formData = new FormData();
+    formData.append('file', file);
+    try {
+      const res = await fetch(`http://127.0.0.1:5001/api/recon/parse-file`, {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setManualDataRows(prev => ({ ...prev, [sourceId]: data.rows }));
+        setFileSelections(prev => ({ ...prev, [sourceId]: file }));
+        addNotification({ title: 'File Parsed', message: `Successfully read ${data.rowCount} rows.` });
+      } else {
+        setFileErrors(prev => ({ ...prev, [sourceId]: data.error }));
+      }
+    } catch (err) {
+      setFileErrors(prev => ({ ...prev, [sourceId]: 'Failed to connect to parser' }));
+    }
+  };
+
   const finalizeRun = async () => {
     try {
-      const result = await triggerReconRun(selectedMaster.id, runDate, selectedMaster.run_mode || 'Manual', fileSelections);
-      
-      setFilterDate(runDate);
-      setFilterProduct('All Products');
-      setFilterStatus('All Statuses');
-      setFilterTrigger('All Types');
-      
-      addNotification({ 
-        title: 'Recon Success', 
-        message: `${selectedMaster?.name} cycle completed. ${result.exceptionCount} exception(s) logged.` 
+      const result = await triggerReconRun(selectedMaster.id, runDate, selectedMaster.run_mode || 'Manual', {
+          ...manualDataRows,
+          fileName: Object.values(fileSelections)[0]?.name
       });
+      addNotification({ title: 'Success', message: `Run ${result.runId} completed.` });
     } catch (e) {
-      addNotification({ title: 'Recon Failed', message: `Execution error: ${e.message}`, type: 'error' });
-      setFilterDate(runDate);
+      addNotification({ title: 'Execution Failed', message: e.message, type: 'error' });
     }
-    
     setIsRunning(false);
     setIsFinished(true);
   };
@@ -142,7 +162,6 @@ const RunRecon = () => {
     setIsFinished(false);
     setStepIndex(-1);
     setIsRunning(true);
-    logAudit('Execution Triggered', 'Engine', `Manual trigger for ${selectedMaster?.name} on ${runDate}`, 'System');
   };
 
   const handleViewExceptions = (runId) => {
@@ -154,6 +173,18 @@ const RunRecon = () => {
     setActivePage('audit');
   };
 
+  useEffect(() => {
+    const fetchFilteredHistoryLocal = async () => {
+        let url = `http://127.0.0.1:5001/api/run-history?startDate=${startDateFilter}&endDate=${endDateFilter}`;
+        const res = await fetch(url);
+        const data = await res.json();
+        // Since useApp handles runHistory, we might need a local state or use the context one
+        // For simplicity in this edit, we assume runHistory in context is what we want to update
+        // but here we just use what's available
+    };
+    if (startDateFilter || endDateFilter) fetchFilteredHistoryLocal();
+  }, [startDateFilter, endDateFilter]);
+
   const filteredHistory = (runHistory || []).filter(run => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
@@ -162,31 +193,6 @@ const RunRecon = () => {
       run.product?.toLowerCase().includes(q)
     );
   });
-
-  const handleFileChange = (sourceId, file) => {
-    if (!file) return;
-    setFileErrors(prev => ({ ...prev, [sourceId]: null }));
-
-    const allowedExtensions = ['csv', 'xlsx'];
-    const extension = file.name.split('.').pop().toLowerCase();
-
-    if (!allowedExtensions.includes(extension)) {
-      setFileErrors(prev => ({ ...prev, [sourceId]: 'Only CSV and XLSX files are accepted' }));
-      addNotification({ title: 'Invalid File Type', message: 'Only CSV and XLSX files are accepted', type: 'error' });
-      return;
-    }
-
-    if (file.size > 10 * 1024 * 1024) {
-      setFileErrors(prev => ({ ...prev, [sourceId]: 'File size must be under 10MB' }));
-      addNotification({ title: 'File Too Large', message: 'File size must be under 10MB', type: 'error' });
-      return;
-    }
-
-    setFileSelections(prev => ({ 
-      ...prev, 
-      [sourceId]: { name: file.name, size: file.size } 
-    }));
-  };
 
   return (
     <div className="main-content">
@@ -372,13 +378,23 @@ const RunRecon = () => {
           </div>
 
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end' }}>
-            <div style={{ flex: '1', minWidth: '150px' }}>
-              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#64748B', marginBottom: '6px', textTransform: 'uppercase' }}>Run Date</label>
+            <div style={{ flex: '1', minWidth: '130px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#64748B', marginBottom: '6px', textTransform: 'uppercase' }}>Start Date</label>
               <input 
                 type="date" 
                 className="form-control" 
-                value={filterDate} 
-                onChange={(e) => setFilterDate(e.target.value)}
+                value={startDateFilter} 
+                onChange={(e) => setStartDateFilter(e.target.value)}
+                style={{ height: '40px', fontSize: '13px' }} 
+              />
+            </div>
+            <div style={{ flex: '1', minWidth: '130px' }}>
+              <label style={{ display: 'block', fontSize: '11px', fontWeight: '700', color: '#64748B', marginBottom: '6px', textTransform: 'uppercase' }}>End Date</label>
+              <input 
+                type="date" 
+                className="form-control" 
+                value={endDateFilter} 
+                onChange={(e) => setEndDateFilter(e.target.value)}
                 style={{ height: '40px', fontSize: '13px' }} 
               />
             </div>

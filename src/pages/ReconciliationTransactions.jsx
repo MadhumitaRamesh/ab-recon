@@ -67,10 +67,28 @@ const ReconciliationTransactions = () => {
   const fetchDetailSubData = async (batchId, tab) => {
     setLoadingDetail(true);
     try {
-      const endpoint = `${API_URL}/recon-transactions/${batchId}/${tab.toLowerCase()}`;
+      const endpoint = tab === 'Transactions' 
+        ? `${API_URL}/recon-results/${batchId}` 
+        : `${API_URL}/recon-transactions/${batchId}/${tab.toLowerCase()}`;
+      
       const res = await fetch(endpoint);
       const data = await res.json();
-      setDetailData(data);
+      
+      if (tab === 'Transactions') {
+          // Normalize recon_results format for the grid
+          const normalized = data.map(r => ({
+              id: r.id,
+              amount: r.amount,
+              ref_no: r.reference_number,
+              type: r.result_type,
+              status: r.status,
+              priority: r.result_type === 'Exception' ? 'High' : 'Low',
+              isVirtual: false
+          }));
+          setDetailData(normalized);
+      } else {
+          setDetailData(data);
+      }
     } catch (err) {
       console.error(`Failed to fetch ${tab} data:`, err);
     } finally {
@@ -80,7 +98,7 @@ const ReconciliationTransactions = () => {
 
   useEffect(() => {
     if (level === 3 && selectedRecord) {
-      fetchDetailSubData(selectedRecord.recon_id, detailTab);
+      fetchDetailSubData(selectedRecord.id || selectedRecord.recon_id, detailTab);
     }
   }, [level, selectedRecord, detailTab]);
 
@@ -96,32 +114,10 @@ const ReconciliationTransactions = () => {
     setSearchQuery('');
   };
 
-  // --- Consistency Engine ---
-  // If detailData for 'Transactions' only contains exceptions, we append virtual 'Matched' records
-  // to ensure the grid total matches the summary total (e.g. 61).
   const unifiedTransactions = useMemo(() => {
-    if (detailTab !== 'Transactions' || !detailData || !selectedRecord) return detailData;
-    
-    const exceptions = Array.isArray(detailData) ? detailData : [];
-    const totalCount = selectedRecord.claim_amount;
-    const matchedCount = selectedRecord.transaction_amount;
-    
-    // If we already have the full list, return it
-    if (exceptions.length >= totalCount) return exceptions;
-    
-    // Otherwise, generate virtual 'Matched' entries to satisfy the "61 Rule"
-    const matchedEntries = Array.from({ length: matchedCount }).map((_, i) => ({
-      id: `M-${i + 1}`,
-      type: 'Matched',
-      amount: '-',
-      ref_no: 'System Verified',
-      status: 'Closed',
-      priority: 'None',
-      isVirtual: true
-    }));
-    
-    return [...exceptions, ...matchedEntries];
-  }, [detailTab, detailData, selectedRecord]);
+    if (detailTab !== 'Transactions' || !detailData) return Array.isArray(detailData) ? detailData : [];
+    return detailData;
+  }, [detailTab, detailData]);
 
   const getStatusColor = (status) => {
     switch (status) {
