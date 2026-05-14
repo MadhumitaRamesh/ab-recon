@@ -247,15 +247,26 @@ const RunRecon = () => {
                             {fileErrors[source.id] ? `⚠ ${fileErrors[source.id]}` : (fileSelections[source.id] ? `✓ ${fileSelections[source.id].name}` : 'CSV/XLSX required')}
                           </div>
                         </div>
-                        <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', fontSize: '12px', fontWeight: '800', padding: '8px 12px', background: 'rgba(123, 17, 19, 0.05)', borderRadius: '8px' }}>
-                          <FileUp size={16} /> Choose
-                          <input 
-                            type="file" 
-                            style={{ display: 'none' }} 
-                            disabled={isRunning} 
-                            onChange={(e) => handleFileChange(source.id, e.target.files[0])}
-                          />
-                        </label>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
+                          <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--primary)', fontSize: '12px', fontWeight: '800', padding: '8px 12px', background: 'rgba(123, 17, 19, 0.05)', borderRadius: '8px' }}>
+                            <FileUp size={16} /> Choose
+                            <input 
+                              type="file" 
+                              style={{ display: 'none' }} 
+                              disabled={isRunning} 
+                              onChange={(e) => handleFileChange(source.id, e.target.files[0])}
+                            />
+                          </label>
+                          {source.sampleTemplate && (
+                            <a 
+                              href={`http://127.0.0.1:5001/api/recon-masters/${selectedMaster.id}/sample-file/${source.name}`}
+                              download
+                              style={{ fontSize: '10px', color: '#64748B', textDecoration: 'underline', fontWeight: '700' }}
+                            >
+                              Download Sample Format
+                            </a>
+                          )}
+                        </div>
                       </div>
                     ) : source.type === 'Automatic' ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: '16px', padding: '16px', background: '#FFFBEB', borderRadius: '12px', border: '1px solid #FDE68A' }}>

@@ -2,7 +2,43 @@ const express = require('express');
 const mysql = require('mysql2');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 require('dotenv').config();
+
+// Ensure templates directory exists
+const uploadDir = path.join(__dirname, 'uploads', 'templates');
+if (!fs.existsSync(uploadDir)) {
+    fs.mkdirSync(uploadDir, { recursive: true });
+}
+
+// Multer storage config
+const storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+        const { id } = req.params;
+        const sourceLabel = req.body.sourceLabel || 'default';
+        const cleanLabel = sourceLabel.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+        cb(null, `template_${id}_${cleanLabel}${path.extname(file.originalname)}`);
+    }
+});
+
+const upload = multer({ 
+    storage,
+    limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+    fileFilter: (req, file, cb) => {
+        const allowedExts = ['.xlsx', '.csv'];
+        const ext = path.extname(file.originalname).toLowerCase();
+        if (allowedExts.includes(ext)) {
+            cb(null, true);
+        } else {
+            cb(new Error('Only .xlsx and .csv files are allowed.'));
+        }
+    }
+});
 
 const app = express();
 app.use(cors({ 
@@ -242,6 +278,68 @@ app.delete('/api/masters/:id', (req, res) => {
     db.query('DELETE FROM masters WHERE id = ?', [req.params.id], (err) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json({ success: true });
+    });
+});
+
+// --- SAMPLE FILE TEMPLATES ---
+app.post('/api/recon-masters/:id/sample-file', upload.single('file'), (req, res) => {
+    const { id } = req.params;
+    const { sourceLabel } = req.body;
+    
+    if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
+    if (!sourceLabel) return res.status(400).json({ error: 'Source label is required.' });
+
+    // Update the masters table's source_config to include the template filename
+    db.query('SELECT source_config FROM masters WHERE id = ?', [id], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (results.length === 0) return res.status(404).json({ error: 'Master not found.' });
+
+        let config = [];
+        try {
+            config = typeof results[0].source_config === 'string' ? JSON.parse(results[0].source_config) : results[0].source_config;
+        } catch (e) {
+            config = [];
+        }
+
+        const updatedConfig = config.map(src => {
+            if (src.name === sourceLabel) {
+                return { ...src, sampleTemplate: req.file.filename };
+            }
+            return src;
+        });
+
+        db.query('UPDATE masters SET source_config = ? WHERE id = ?', [JSON.stringify(updatedConfig), id], (err) => {
+            if (err) return res.status(500).json({ error: err.message });
+            res.json({ success: true, filename: req.file.filename });
+        });
+    });
+});
+
+app.get('/api/recon-masters/:id/sample-file/:sourceLabel', (req, res) => {
+    const { id, sourceLabel } = req.params;
+
+    db.query('SELECT source_config FROM masters WHERE id = ?', [id], (err, results) => {
+        if (err) return res.status(500).json({ error: err.message });
+        if (results.length === 0) return res.status(404).json({ error: 'Master not found.' });
+
+        let config = [];
+        try {
+            config = typeof results[0].source_config === 'string' ? JSON.parse(results[0].source_config) : results[0].source_config;
+        } catch (e) {
+            config = [];
+        }
+
+        const source = config.find(src => src.name === sourceLabel);
+        if (!source || !source.sampleTemplate) {
+            return res.status(404).json({ error: 'Sample template not found for this source.' });
+        }
+
+        const filePath = path.join(uploadDir, source.sampleTemplate);
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'File not found on server.' });
+        }
+
+        res.download(filePath);
     });
 });
 

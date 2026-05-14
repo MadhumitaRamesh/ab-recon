@@ -154,6 +154,51 @@ const ReconMaster = () => {
                         placeholder={`e.g. ${source.id === 'A' ? 'Internal Ledger' : 'Bank Statement'}`}
                       />
                     </div>
+
+                    {source.type === 'Manual Upload' && (
+                      <div className="form-group" style={{ marginBottom: '16px' }}>
+                        <label style={{ fontSize: '12px', color: '#64748B', fontWeight: '700', marginBottom: '8px', display: 'block' }}>Sample File Template (.xlsx, .csv under 5MB)</label>
+                        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+                          <input 
+                            type="file" 
+                            accept=".xlsx,.csv"
+                            style={{ fontSize: '12px', flex: 1 }}
+                            onChange={async (e) => {
+                              const file = e.target.files[0];
+                              if (!file) return;
+                              if (file.size > 5 * 1024 * 1024) {
+                                addNotification({ title: 'File Too Large', message: 'Template must be under 5MB', type: 'error' });
+                                return;
+                              }
+                              if (editingMaster) {
+                                const formData = new FormData();
+                                formData.append('file', file);
+                                formData.append('sourceLabel', source.name);
+                                try {
+                                  const res = await fetch(`http://127.0.0.1:5001/api/recon-masters/${editingMaster.id}/sample-file`, {
+                                    method: 'POST',
+                                    body: formData
+                                  });
+                                  const result = await res.json();
+                                  if (result.success) {
+                                    updateSourceField(source.id, 'sampleTemplate', result.filename);
+                                    addNotification({ title: 'Template Uploaded', message: `Format for ${source.name} saved.` });
+                                  }
+                                } catch (err) {
+                                  addNotification({ title: 'Upload Failed', message: err.message, type: 'error' });
+                                }
+                              } else {
+                                // For new masters, we'll just store the file in memory and warn
+                                addNotification({ title: 'Save Master First', message: 'Please save the master before uploading templates.', type: 'info' });
+                              }
+                            }}
+                          />
+                          {source.sampleTemplate && (
+                            <span style={{ fontSize: '11px', color: '#10B981', fontWeight: '700' }}>✓ Saved</span>
+                          )}
+                        </div>
+                      </div>
+                    )}
                     
                     <div className="form-group">
                       <label style={{ fontSize: '12px', color: '#64748B', fontWeight: '700', marginBottom: '8px', display: 'block' }}>Ingestion Type</label>
