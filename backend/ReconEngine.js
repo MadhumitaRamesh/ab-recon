@@ -8,6 +8,7 @@ const XLSX = require('xlsx');
 async function runReconciliation(masterConfig, runDate, triggerType, manualData = {}) {
     const startTime = new Date();
     const runId = `RUN-${Math.floor(Math.random() * 89999) + 10000}`;
+    const connection = await db.promise().getConnection();
     
     console.log(`[ENGINE] Starting reconciliation for ${masterConfig.name} (${runId})`);
 
@@ -18,6 +19,8 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
     let fileName = manualData.fileName || 'Manual_Upload';
 
     try {
+        await connection.beginTransaction();
+
         // 1. Data Retrieval and Validation
         for (const source of sources) {
             const sourceType = (source.type || '').trim();
@@ -25,12 +28,11 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
             const mapping = source.mapping || { amount: 'amount', reference: 'reference_number' };
 
             if (sourceType === 'Manual Upload') {
-                const provided = manualData[source.id]; // Expecting Array of Objects
+                const provided = manualData[source.id]; 
                 if (!provided || provided.length === 0) {
                     throw new Error(`Data missing for source: ${sourceLabel}`);
                 }
 
-                // Header Validation
                 const firstRow = provided[0];
                 const hasAmt = mapping.amount in firstRow;
                 const hasRef = mapping.reference in firstRow;
@@ -47,26 +49,32 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
                 
                 totalRowsRead += provided.length;
             } else if (sourceType === 'API-Based') {
-                // In a production environment, this would perform a real HTTP fetch using source.apiUrl and source.apiKey
-                // For this implementation, we simulate receiving data (or using provided data if it exists)
-                const apiResponse = manualData[source.id] || []; 
-                const apiMapping = source.apiMapping || [];
+                let apiResponse = manualData[source.id];
+                
+                if (!apiResponse || apiResponse.length === 0) {
+                    if (source.sampleResponse) {
+                        try {
+                            const sample = JSON.parse(source.sampleResponse);
+                            apiResponse = sample.transactions || sample.data || (Array.isArray(sample) ? sample : []);
+                        } catch (e) { apiResponse = []; }
+                    }
+                }
 
+                if (!apiResponse || apiResponse.length === 0) {
+                    throw new Error(`API Data missing and no valid sample response found for: ${sourceLabel}`);
+                }
+
+                const apiMapping = source.apiMapping || [];
                 sourceData[source.id] = apiResponse.map(item => {
                     const mappedItem = {};
                     if (apiMapping.length > 0) {
                         apiMapping.forEach(m => {
-                            if (m.apiField && m.dbColumn) {
-                                mappedItem[m.dbColumn] = item[m.apiField];
-                            }
+                            if (m.apiField && m.dbColumn) mappedItem[m.dbColumn] = item[m.apiField];
                         });
                     } else {
-                        // Fallback to raw response fields
                         Object.assign(mappedItem, item);
                     }
 
-                    // For the purpose of the internal recon engine, we still need to align to amount/reference
-                    // using the standard mapping defined in the Recon Master
                     return {
                         amount: parseFloat(mappedItem[mapping.amount] || item[mapping.amount]) || 0,
                         reference_number: String(mappedItem[mapping.reference] || item[mapping.reference] || ''),
@@ -76,7 +84,6 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
                 
                 totalRowsRead += apiResponse.length;
             } else {
-                // Defensive fallback for other types (can be expanded later)
                 sourceData[source.id] = []; 
             }
         }
@@ -99,7 +106,6 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
         let matchedCount = 0;
         let exceptionCount = 0;
 
-        // Process Source A
         sourceA.forEach(txnA => {
             const key = `${txnA.amount}|${txnA.reference_number}`;
             const matches = bMap.get(key);
@@ -107,88 +113,109 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
             if (matches && matches.length > 0) {
                 matchedCount++;
                 results.push({
-                    run_id: runId,
-                    recon_master_id: masterConfig.id,
-                    amount: txnA.amount,
-                    reference_number: txnA.reference_number,
-                    result_type: 'Matched',
-                    transaction_date: txnA.transaction_date || runDate,
+                    run_id: runId, recon_master_id: masterConfig.id,
+                    amount: txnA.amount, reference_number: txnA.reference_number,
+                    result_type: 'Matched', transaction_date: txnA.transaction_date || runDate,
                     status: 'Closed'
                 });
                 matches.shift();
             } else {
                 exceptionCount++;
                 results.push({
-                    run_id: runId,
-                    recon_master_id: masterConfig.id,
-                    amount: txnA.amount,
-                    reference_number: txnA.reference_number,
-                    result_type: 'Exception',
-                    exception_type: 'Missing in Source B',
+                    run_id: runId, recon_master_id: masterConfig.id,
+                    amount: txnA.amount, reference_number: txnA.reference_number,
+                    result_type: 'Exception', exception_type: 'Missing in Source B',
                     transaction_date: txnA.transaction_date || runDate,
                     status: 'Open'
                 });
             }
         });
 
-        // Flag leftovers in B
         bMap.forEach(remaining => {
             remaining.forEach(txnB => {
                 exceptionCount++;
                 results.push({
-                    run_id: runId,
-                    recon_master_id: masterConfig.id,
-                    amount: txnB.amount,
-                    reference_number: txnB.reference_number,
-                    result_type: 'Exception',
-                    exception_type: 'Missing in Source A',
+                    run_id: runId, recon_master_id: masterConfig.id,
+                    amount: txnB.amount, reference_number: txnB.reference_number,
+                    result_type: 'Exception', exception_type: 'Missing in Source A',
                     transaction_date: txnB.transaction_date || runDate,
                     status: 'Open'
                 });
             });
         });
 
-        // 3. Finalize Run (Atomic Transaction)
         const endTime = new Date();
-        const connection = await db.promise().getConnection();
-        try {
-            await connection.beginTransaction();
 
-            // History Audit Log
+        // Persist Run History
+        await connection.query(
+            'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time, total_rows, valid_rows, file_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+            [runId, masterConfig.name, 'Completed', triggerType, matchedCount, exceptionCount, runDate, 
+             endTime.toLocaleTimeString('en-GB', { hour12: false }), 
+             startTime.toLocaleTimeString('en-GB', { hour12: false }), 
+             endTime.toLocaleTimeString('en-GB', { hour12: false }), 
+             totalRowsRead, results.length, fileName]
+        );
+
+        // Detailed Results
+        if (results.length > 0) {
+            const values = results.map(r => [
+                r.run_id, r.recon_master_id, r.reference_number, r.amount, 
+                r.result_type, r.exception_type || null, r.status, r.transaction_date
+            ]);
             await connection.query(
-                'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time, total_rows, valid_rows, file_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                [runId, masterConfig.name, 'Completed', triggerType, matchedCount, exceptionCount, runDate, 
-                 endTime.toLocaleTimeString('en-GB', { hour12: false }), 
-                 startTime.toLocaleTimeString('en-GB', { hour12: false }), 
-                 endTime.toLocaleTimeString('en-GB', { hour12: false }), 
-                 totalRowsRead, results.length, fileName]
+                'INSERT INTO recon_results (run_id, recon_master_id, reference_number, amount, result_type, exception_type, status, transaction_date) VALUES ?',
+                [values]
             );
 
-            // Detailed Results
-            if (results.length > 0) {
-                const values = results.map(r => [
-                    r.run_id, r.recon_master_id, r.reference_number, r.amount, 
-                    r.result_type, r.exception_type || null, r.status, r.transaction_date
+            const exceptionsOnly = results.filter(r => r.result_type === 'Exception');
+            if (exceptionsOnly.length > 0) {
+                const exValues = exceptionsOnly.map((e, idx) => [
+                    `EX-${runId}-${idx + 1}`, e.amount, e.reference_number,
+                    e.exception_type || 'Mismatch', '0 days', 'High', 'Pending',
+                    masterConfig.id, runId, runDate, 'System', e.reference_number, 'Operations'
                 ]);
                 await connection.query(
-                    'INSERT INTO recon_results (run_id, recon_master_id, reference_number, amount, result_type, exception_type, status, transaction_date) VALUES ?',
-                    [values]
+                    'INSERT INTO exceptions (id, amount, ref_no, type, age, priority, status, recon_master_id, run_id, run_date, source_type, unique_reference_number, assigned_role) VALUES ?',
+                    [exValues]
                 );
             }
-
-            await connection.commit();
-            return { success: true, runId, matchedCount, exceptionCount };
-
-        } catch (dbErr) {
-            await connection.rollback();
-            throw dbErr;
-        } finally {
-            connection.release();
         }
 
-    } catch (error) {
-        console.error(`[ENGINE_ERROR] Batch ${runId} failed:`, error.message);
-        throw error;
+        await connection.query(
+            'INSERT INTO audit_logs (user_name, action, module, detail, log_time, log_date, type, forensic_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            ['System', 'Recon Completed', masterConfig.name, `Batch ${runId} finalized. Matched: ${matchedCount}, Exceptions: ${exceptionCount}`, 
+             endTime.toLocaleTimeString('en-GB', { hour12: false }), runDate, 'Activity', `SUCCESS_${runId}`]
+        );
+
+        await connection.commit();
+        return { success: true, runId, matchedCount, exceptionCount };
+
+    } catch (err) {
+        if (connection) {
+            await connection.rollback();
+            try {
+                await connection.query(
+                    'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time, total_rows, valid_rows, file_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                    [runId, masterConfig.name, 'Failed', triggerType, 0, 0, runDate, 
+                     new Date().toLocaleTimeString('en-GB', { hour12: false }), 
+                     startTime.toLocaleTimeString('en-GB', { hour12: false }), 
+                     new Date().toLocaleTimeString('en-GB', { hour12: false }), 
+                     totalRowsRead, 0, fileName]
+                );
+                await connection.query(
+                    'INSERT INTO audit_logs (user_name, action, module, detail, log_time, log_date, type, forensic_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                    ['System', 'Recon Failed', masterConfig.name, `Batch ${runId} failed: ${err.message}`, 
+                     new Date().toLocaleTimeString('en-GB', { hour12: false }), 
+                     runDate, 'Error', `ERR_${runId}`]
+                );
+            } catch (auditErr) {
+                console.error(`[ENGINE_AUDIT_ERROR] Failed to log failure for ${runId}:`, auditErr.message);
+            }
+        }
+        console.error(`[ENGINE_ERROR] Batch ${runId} failed: ${err.message}`);
+        throw err;
+    } finally {
+        if (connection) connection.release();
     }
 }
 

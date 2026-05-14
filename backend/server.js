@@ -479,7 +479,17 @@ app.get('/api/run-history', async (req, res) => {
         
         sql += ' ORDER BY run_date DESC, run_time DESC LIMIT 100';
         const [rows] = await db.promise().query(sql, params);
-        res.json(rows);
+        
+        // Map fields for frontend compatibility
+        const mapped = rows.map(r => ({
+            ...r,
+            matched: r.matched_count,
+            exceptions: r.exception_count,
+            rawDate: r.run_date,
+            triggerType: r.trigger_type
+        }));
+        
+        res.json(mapped);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
