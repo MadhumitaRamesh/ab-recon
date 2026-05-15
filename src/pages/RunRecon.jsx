@@ -79,8 +79,10 @@ const RunRecon = () => {
     setIsFinished(false);
   }, [selectedMasterId]);
 
-  const manualSources = selectedMaster?.source_config?.filter(s => s.type === 'Manual Upload') || [];
-  const missingFiles = manualSources.filter(s => !fileSelections[s.id]);
+  const manualSources = selectedMaster?.source_config
+    ?.map((s, i) => ({ ...s, _idx: i }))
+    .filter(s => s.type === 'Manual Upload') || [];
+  const missingFiles = manualSources.filter(s => !fileSelections[s._idx]);
   const canExecute = selectedMaster && missingFiles.length === 0;
 
   const sequence = [
@@ -144,9 +146,14 @@ const RunRecon = () => {
 
   const finalizeRun = async () => {
     try {
+      const fileNames = Object.entries(fileSelections)
+        .sort(([a], [b]) => Number(a) - Number(b))
+        .map(([, f]) => f.name)
+        .join(' | ');
+
       const result = await triggerReconRun(selectedMaster.id, runDate, selectedMaster.run_mode || 'Manual', {
           ...manualDataRows,
-          fileName: Object.values(fileSelections)[0]?.name
+          fileName: fileNames
       });
       addNotification({ title: 'Success', message: `Run ${result.runId} completed.` });
     } catch (e) {
@@ -243,14 +250,14 @@ const RunRecon = () => {
               </div>
               
               <div style={{ display: 'grid', gap: '12px' }}>
-                {selectedMaster.source_config?.map(source => (
-                  <div key={source.id}>
+                {selectedMaster.source_config?.map((source, sourceIdx) => (
+                  <div key={sourceIdx}>
                     {source.type === 'Manual Upload' ? (
-                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'white', borderRadius: '12px', border: fileSelections[source.id] ? '1px solid #10B981' : '1px solid #E2E8F0' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '16px', background: 'white', borderRadius: '12px', border: fileSelections[sourceIdx] ? '1px solid #10B981' : '1px solid #E2E8F0' }}>
                         <div>
                           <div style={{ fontSize: '13px', fontWeight: '800' }}>{source.name}</div>
-                          <div style={{ fontSize: '11px', color: fileErrors[source.id] ? '#DC2626' : (fileSelections[source.id] ? '#10B981' : '#94A3B8'), fontWeight: '600' }}>
-                            {fileErrors[source.id] ? `⚠ ${fileErrors[source.id]}` : (fileSelections[source.id] ? `✓ ${fileSelections[source.id].name}` : 'CSV/XLSX required')}
+                          <div style={{ fontSize: '11px', color: fileErrors[sourceIdx] ? '#DC2626' : (fileSelections[sourceIdx] ? '#10B981' : '#94A3B8'), fontWeight: '600' }}>
+                            {fileErrors[sourceIdx] ? `⚠ ${fileErrors[sourceIdx]}` : (fileSelections[sourceIdx] ? `✓ ${fileSelections[sourceIdx].name}` : 'CSV/XLSX required')}
                           </div>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', alignItems: 'flex-end' }}>
@@ -258,9 +265,11 @@ const RunRecon = () => {
                             <FileUp size={16} /> Choose
                             <input 
                               type="file" 
+                              key={`file-input-${sourceIdx}`}
                               style={{ display: 'none' }} 
                               disabled={isRunning} 
-                              onChange={(e) => handleFileChange(source.id, e.target.files[0])}
+                              accept=".csv,.xlsx,.xls"
+                              onChange={(e) => handleFileChange(sourceIdx, e.target.files[0])}
                             />
                           </label>
                           {source.sampleTemplate && (
