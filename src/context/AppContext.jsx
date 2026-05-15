@@ -68,14 +68,25 @@ export const AppProvider = ({ children }) => {
 
   const normalizeRunHistory = useCallback((r) => {
     const datePart = r.run_date ? (typeof r.run_date === 'string' ? r.run_date.split('T')[0] : r.run_date.toISOString().split('T')[0]) : null;
+    
+    // Helper to parse time strings or ISO strings
+    const formatTime = (t) => {
+        if (!t) return '--';
+        if (typeof t === 'string' && t.includes(':') && !t.includes('T') && !t.includes('-')) return t; // Already a time string
+        try {
+            const d = new Date(t);
+            return d.toString() !== 'Invalid Date' ? d.toLocaleTimeString() : t;
+        } catch (e) { return t; }
+    };
+
     return {
       id: r.id, product: r.product, triggerType: r.trigger_type,
       rawDate: datePart,
       date: datePart ? new Date(datePart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '--',
-      status: r.status, matched: Number(r.matched_count).toLocaleString('en-IN'),
-      exceptions: Number(r.exception_count).toLocaleString('en-IN'),
-      startTime: r.start_time ? new Date(r.start_time).toLocaleTimeString() : '--',
-      endTime: r.end_time ? new Date(r.end_time).toLocaleTimeString() : '--',
+      status: r.status, matched: Number(r.matched_count || 0).toLocaleString('en-IN'),
+      exceptions: Number(r.exception_count || 0).toLocaleString('en-IN'),
+      startTime: formatTime(r.start_time),
+      endTime: formatTime(r.end_time),
       matchedAmount: r.matched_amount || 0,
       exceptionAmount: r.exception_amount || 0,
       claimAmount: r.claim_amount || 0,
