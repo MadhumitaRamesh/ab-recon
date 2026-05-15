@@ -71,33 +71,22 @@ const ReconciliationTransactions = () => {
     if (level === 2) fetchTransactions();
   }, [level, fetchTransactions]);
 
-  const fetchDetailSubData = async (batchId, tab) => {
+  const [exceptionsData, setExceptionsData] = useState([]);
+
+  const fetchDetailSubData = async (batchId) => {
     setLoadingDetail(true);
     try {
-      const endpoint = tab === 'Transactions' 
-        ? `${API_URL}/recon-results/${batchId}` 
-        : `${API_URL}/recon-transactions/${batchId}/${tab.toLowerCase()}`;
-      
-      const res = await fetch(endpoint);
-      const data = await res.json();
-      
-      if (tab === 'Transactions') {
-          // Normalize recon_results format for the grid
-          const normalized = data.map(r => ({
-              id: r.id,
-              amount: r.amount,
-              ref_no: r.reference_number,
-              type: r.result_type,
-              status: r.status,
-              priority: r.result_type === 'Exception' ? 'High' : 'Low',
-              isVirtual: false
-          }));
-          setDetailData(normalized);
-      } else {
-          setDetailData(data);
-      }
+      // 1. Fetch Overview Data
+      const overRes = await fetch(`${API_URL}/recon-transactions/${batchId}/overview`);
+      const overData = await overRes.json();
+      setDetailData(overData);
+
+      // 2. Fetch Exceptions List (Transactions)
+      const exRes = await fetch(`${API_URL}/recon-transactions/${batchId}/transactions`);
+      const exData = await exRes.json();
+      setExceptionsData(Array.isArray(exData) ? exData : []);
     } catch (err) {
-      console.error(`Failed to fetch ${tab} data:`, err);
+      console.error(`Failed to fetch detail data:`, err);
     } finally {
       setLoadingDetail(false);
     }
@@ -105,9 +94,9 @@ const ReconciliationTransactions = () => {
 
   useEffect(() => {
     if (level === 3 && selectedRecord) {
-      fetchDetailSubData(selectedRecord.id || selectedRecord.recon_id, detailTab);
+      fetchDetailSubData(selectedRecord.id || selectedRecord.recon_id);
     }
-  }, [level, selectedRecord, detailTab]);
+  }, [level, selectedRecord]);
 
   const handleMasterSelect = (master) => {
     setSelectedMaster(master);
@@ -120,11 +109,6 @@ const ReconciliationTransactions = () => {
     setActiveTab('All');
     setSearchQuery('');
   };
-
-  const unifiedTransactions = useMemo(() => {
-    if (detailTab !== 'Transactions' || !detailData) return Array.isArray(detailData) ? detailData : [];
-    return detailData;
-  }, [detailTab, detailData]);
 
   const getStatusColor = (status) => {
     switch (status) {
@@ -305,13 +289,13 @@ const ReconciliationTransactions = () => {
           </button>
           <div>
             <div style={{ fontSize: '12px', color: '#64748B', fontWeight: '700', textTransform: 'uppercase' }}>{selectedMaster.name}</div>
-            <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0F172A' }}>Batch {selectedRecord.recon_id} - {selectedRecord.transaction_date}</h1>
+            <h1 style={{ fontSize: '24px', fontWeight: '800', color: '#0F172A' }}>Batch {selectedRecord.id || selectedRecord.recon_id} - {selectedRecord.date || selectedRecord.transaction_date}</h1>
           </div>
         </div>
 
         <div className="card" style={{ padding: '0', overflow: 'hidden', marginBottom: '32px' }}>
           <div style={{ display: 'flex', borderBottom: '1px solid #F1F5F9', background: '#F8FAFC' }}>
-            {['Overview', 'Summary', 'Refund', 'Transactions', 'SNR'].map(tab => (
+            {['Overview'].map(tab => (
               <button
                 key={tab} onClick={() => setDetailTab(tab)}
                 style={{
@@ -321,7 +305,7 @@ const ReconciliationTransactions = () => {
                   fontWeight: '700', fontSize: '14px', cursor: 'pointer'
                 }}
               >
-                {tab} {tab === 'Transactions' && `(${selectedRecord.claim_amount})`}
+                {tab}
               </button>
             ))}
           </div>
@@ -331,7 +315,7 @@ const ReconciliationTransactions = () => {
               <div style={{ padding: '40px', textAlign: 'center' }}>
                 <RefreshCw size={32} className="animate-spin" color="var(--primary)" style={{ margin: '0 auto' }} />
               </div>
-            ) : detailTab === 'Overview' && detailData ? (
+            ) : detailData ? (
               <div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '32px' }}>
                   <div style={{ padding: '24px', background: '#F8FAFC', borderRadius: '16px', border: '1px solid #E2E8F0' }}>
@@ -350,8 +334,9 @@ const ReconciliationTransactions = () => {
                     <div style={{ fontSize: '11px', color: '#DC2626', marginTop: '4px' }}>Requires Action</div>
                   </div>
                 </div>
+                
                 <h4 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', color: '#1E293B' }}>SOURCE DATA LINEAGE</h4>
-                <div className="responsive-table-container">
+                <div className="responsive-table-container" style={{ marginBottom: '40px' }}>
                   <table className="data-table">
                     <thead>
                       <tr><th>Source Entity</th><th>Type</th><th>Validation Point</th></tr>
@@ -367,99 +352,46 @@ const ReconciliationTransactions = () => {
                     </tbody>
                   </table>
                 </div>
-              </div>
-            ) : detailTab === 'Summary' && detailData ? (
-              <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '40px' }}>
-                <div>
-                  <h3 style={{ fontSize: '18px', fontWeight: '800', marginBottom: '24px' }}>Batch Performance Metrics</h3>
-                  <div style={{ display: 'grid', gap: '16px' }}>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '20px', background: '#F8FAFC', borderRadius: '12px', border: '1px solid #F1F5F9' }}>
-                      <span style={{ color: '#64748B', fontWeight: '600' }}>Verification Success Rate</span>
-                      <span style={{ fontWeight: '900', color: '#059669', fontSize: '18px' }}>
-                        {Math.round((detailData.matched_count / (Number(detailData.matched_count) + Number(detailData.exception_count))) * 100) || 0}%
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '20px', background: '#F8FAFC', borderRadius: '12px', border: '1px solid #F1F5F9' }}>
-                      <span style={{ color: '#64748B', fontWeight: '600' }}>Exception Frequency</span>
-                      <span style={{ fontWeight: '900', color: '#DC2626', fontSize: '18px' }}>
-                        {Math.round((detailData.exception_count / (Number(detailData.matched_count) + Number(detailData.exception_count))) * 100) || 0}%
-                      </span>
-                    </div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '20px', background: '#F8FAFC', borderRadius: '12px', border: '1px solid #F1F5F9' }}>
-                      <span style={{ color: '#64748B', fontWeight: '600' }}>Audit Consistency Status</span>
-                      <span style={{ fontWeight: '900', color: 'var(--primary)', fontSize: '16px' }}>ALIGNED (61/61)</span>
-                    </div>
-                  </div>
-                </div>
-                <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', background: '#F8FAFC', borderRadius: '24px', padding: '40px', border: '1px solid #E2E8F0' }}>
-                  <div style={{ width: '140px', height: '140px', borderRadius: '50%', border: '12px solid #E2E8F0', borderTopColor: 'var(--primary)', borderRightColor: 'var(--primary)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                     <CheckCircle size={48} color="var(--primary)" />
-                  </div>
-                  <div style={{ marginTop: '24px', textAlign: 'center' }}>
-                    <div style={{ fontSize: '24px', fontWeight: '900', color: '#0F172A' }}>Verified Batch</div>
-                    <div style={{ fontSize: '12px', color: '#64748B', fontWeight: '700', letterSpacing: '0.05em', marginTop: '4px' }}>AUDIT COMPLETE</div>
-                  </div>
-                </div>
-              </div>
-            ) : detailTab === 'Transactions' ? (
-              <div>
-                <div style={{ padding: '12px 16px', background: 'rgba(37, 99, 235, 0.05)', borderRadius: '8px', marginBottom: '20px', border: '1px solid rgba(37, 99, 235, 0.1)', fontSize: '13px', color: '#1E40AF', fontWeight: '600' }}>
-                  <Activity size={14} style={{ marginRight: '8px' }} /> 
-                  Showing all {selectedRecord?.claim_amount || 0} transactions. Matched records are verified by the system and summarized as Closed.
-                </div>
+
+                <h4 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', color: '#1E293B' }}>EXCEPTION TRANSACTIONS</h4>
                 <div className="responsive-table-container">
                   <table className="data-table">
                     <thead>
-                      <tr><th>ID / Ref</th><th>Type</th><th style={{ textAlign: 'right' }}>Amount</th><th>Status</th><th>Priority</th></tr>
+                      <tr>
+                        <th>Exception ID</th>
+                        <th>Reference No</th>
+                        <th>Unique Reference No</th>
+                        <th>Amount</th>
+                        <th>Exception Type</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                      </tr>
                     </thead>
                     <tbody>
-                      {Array.isArray(unifiedTransactions) && unifiedTransactions.map((item, i) => {
-                        const amt = (item?.amount !== '-' && item?.amount != null) 
-                          ? `₹${Number(item.amount).toLocaleString('en-IN')}` 
-                          : '-';
-                        return (
-                          <tr key={i} style={{ opacity: item?.isVirtual ? 0.7 : 1, background: item?.isVirtual ? 'transparent' : '#FFF' }}>
-                            <td style={{ fontWeight: '700' }}>#{item?.id || item?.ref_no || 'N/A'}</td>
-                            <td><span style={{ padding: '3px 8px', borderRadius: '4px', background: item?.isVirtual ? '#F1F5F9' : '#FDF2F2', fontSize: '11px' }}>{item?.type || 'Record'}</span></td>
-                            <td style={{ textAlign: 'right', fontWeight: '800' }}>{amt}</td>
-                            <td><span style={{ fontWeight: '800', color: getStatusColor(item?.status) }}>{item?.status || 'Unknown'}</span></td>
-                            <td><span style={{ color: item?.priority === 'High' ? '#DC2626' : '#94A3B8', fontWeight: '700' }}>{item?.priority || 'N/A'}</span></td>
-                          </tr>
-                        );
-                      })}
+                      {exceptionsData.length > 0 ? exceptionsData.map((ex, i) => (
+                        <tr key={i}>
+                          <td style={{ fontWeight: '800', color: 'var(--primary)' }}>#{ex.id}</td>
+                          <td style={{ fontWeight: '600' }}>{ex.ref_no || 'N/A'}</td>
+                          <td style={{ fontSize: '12px', color: '#64748B' }}>{ex.unique_reference_number || 'N/A'}</td>
+                          <td style={{ fontWeight: '800' }}>₹{Number(ex.amount || 0).toLocaleString('en-IN')}</td>
+                          <td><span style={{ padding: '4px 8px', background: '#FEF2F2', color: '#DC2626', borderRadius: '6px', fontSize: '11px', fontWeight: '700' }}>{ex.type || 'Exception'}</span></td>
+                          <td><span style={{ fontWeight: '800', color: getStatusColor(ex.status) }}>{ex.status}</span></td>
+                          <td><span style={{ color: ex.priority === 'High' ? '#DC2626' : '#94A3B8', fontWeight: '700' }}>{ex.priority || (ex.type === 'Exception' ? 'High' : 'Low')}</span></td>
+                        </tr>
+                      )) : (
+                        <tr>
+                          <td colSpan="7" style={{ padding: '40px', textAlign: 'center', color: '#94A3B8', fontStyle: 'italic' }}>
+                            No transactions found for this run.
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
-                  {(!unifiedTransactions || unifiedTransactions.length === 0) && (
-                    <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>No transaction records found for this batch.</div>
-                  )}
                 </div>
-              </div>
-            ) : (Array.isArray(detailData)) ? (
-              <div className="responsive-table-container">
-                 <table className="data-table">
-                  <thead>
-                    {detailTab === 'Refund' ? (
-                      <tr><th>Reference No</th><th>Amount</th><th>Status</th></tr>
-                    ) : (
-                      <tr><th>ID</th><th>Amount</th><th>Ref No</th><th>Type</th></tr>
-                    )}
-                  </thead>
-                  <tbody>
-                    {detailData.map((item, i) => (
-                      <tr key={i}>
-                        {detailTab === 'Refund' ? (
-                          <><td>{item.ref_no}</td><td style={{ fontWeight: '800' }}>₹{Number(item.amount).toLocaleString('en-IN')}</td><td><span style={{ padding: '3px 8px', background: '#F1F5F9', borderRadius: '4px', fontSize: '11px' }}>{item.status}</span></td></>
-                        ) : (
-                          <><td>#{item.id}</td><td style={{ fontWeight: '800' }}>₹{Number(item.amount).toLocaleString('en-IN')}</td><td>{item.ref_no}</td><td>{item.type}</td></>
-                        )}
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
               </div>
             ) : (
               <div style={{ padding: '60px', textAlign: 'center', color: '#94A3B8' }}>
-                No records found for this category.
+                Unable to retrieve batch data.
               </div>
             )}
           </div>
