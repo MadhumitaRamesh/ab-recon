@@ -127,7 +127,7 @@ export const AppProvider = ({ children }) => {
   }), []);
 
   const normalizePermissions = useCallback((rows) => {
-    if (!rows || rows.length === 0) return getDefaultPermissions();
+    if (!Array.isArray(rows) || rows.length === 0) return getDefaultPermissions();
     const permMap = {};
     rows.forEach(item => {
       if (!permMap[item.module_name]) permMap[item.module_name] = {};
@@ -138,38 +138,62 @@ export const AppProvider = ({ children }) => {
 
   // --- ACTIONS ---
 
-  const fetchAll = useCallback(async () => {
+  const secureFetch = useCallback(async (url, options = {}) => {
     try {
-      const getLocalDate = () => {
-        const d = new Date();
-        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+      const savedUser = localStorage.getItem('ab_recon_user');
+      const token = savedUser ? JSON.parse(savedUser).token : user?.token;
+      
+      const headers = {
+        'Content-Type': 'application/json',
+        ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        ...options.headers
       };
-      const localToday = getLocalDate();
-      const [rawUsers, rawMasters, rawExceptions, rawAudit, rawHistory, rawNotifs, rawAI, rawPerms, rawRoles, rawQueryConfigs] = await Promise.all([
-        fetch(`${API_URL}/users`).then(r => r.json()),
-        fetch(`${API_URL}/masters`).then(r => r.json()),
-        fetch(`${API_URL}/exceptions?date=${localToday}`).then(r => r.json()),
-        fetch(`${API_URL}/audit-logs`).then(r => r.json()),
-        fetch(`${API_URL}/run-history?date=${localToday}`).then(r => r.json()),
-        fetch(`${API_URL}/notifications`).then(r => r.json()),
-        fetch(`${API_URL}/ai-suggestions`).then(r => r.json()),
-        fetch(`${API_URL}/permissions`).then(r => r.json()),
-        fetch(`${API_URL}/roles`).then(r => r.json()),
-        fetch(`${API_URL}/query-configs`).then(r => r.json()),
-      ]);
 
-      setUsers(Array.isArray(rawUsers) ? rawUsers.map(normalizeUser) : []);
-      setMasters(Array.isArray(rawMasters) ? rawMasters : []);
-      setExceptions(Array.isArray(rawExceptions) ? rawExceptions.map(normalizeException) : []);
-      setAuditLogs(Array.isArray(rawAudit) ? rawAudit.map(normalizeAuditLog) : []);
-      setRunHistory(Array.isArray(rawHistory) ? rawHistory.map(normalizeRunHistory) : []);
-      setNotifications(Array.isArray(rawNotifs) ? rawNotifs.map(normalizeNotification) : []);
-      setAiSuggestions(Array.isArray(rawAI) ? rawAI.map(normalizeAiSuggestion) : []);
-      setRoles(Array.isArray(rawRoles) ? rawRoles : []);
-      setPermissions(normalizePermissions(rawPerms));
-      setQueryConfigs(Array.isArray(rawQueryConfigs) ? rawQueryConfigs : []);
-    } catch (err) { console.warn('Sync failed', err.message); }
-  }, [normalizeUser, normalizeException, normalizeAuditLog, normalizeRunHistory, normalizeNotification, normalizeAiSuggestion, normalizePermissions]);
+      const res = await fetch(url, { ...options, headers });
+      if (!res.ok) {
+        if (res.status === 401 || res.status === 403) {
+          console.error(`Auth Error (${res.status}) on ${url}`);
+        }
+        return null;
+      }
+      return await res.json();
+    } catch (err) {
+      console.error(`Fetch Error on ${url}:`, err.message);
+      return null;
+    }
+  }, [user]);
+
+  const fetchAll = useCallback(async () => {
+    const getLocalDate = () => {
+      const d = new Date();
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    };
+    const localToday = getLocalDate();
+    
+    const [rawUsers, rawMasters, rawExceptions, rawAudit, rawHistory, rawNotifs, rawAI, rawPerms, rawRoles, rawQueryConfigs] = await Promise.all([
+      secureFetch(`${API_URL}/users`),
+      secureFetch(`${API_URL}/masters`),
+      secureFetch(`${API_URL}/exceptions?date=${localToday}`),
+      secureFetch(`${API_URL}/audit-logs`),
+      secureFetch(`${API_URL}/run-history?date=${localToday}`),
+      secureFetch(`${API_URL}/notifications`),
+      secureFetch(`${API_URL}/ai-suggestions`),
+      secureFetch(`${API_URL}/permissions`),
+      secureFetch(`${API_URL}/roles`),
+      secureFetch(`${API_URL}/query-configs`),
+    ]);
+
+    setUsers(Array.isArray(rawUsers) ? rawUsers.map(normalizeUser) : []);
+    setMasters(Array.isArray(rawMasters) ? rawMasters : []);
+    setExceptions(Array.isArray(rawExceptions) ? rawExceptions.map(normalizeException) : []);
+    setAuditLogs(Array.isArray(rawAudit) ? rawAudit.map(normalizeAuditLog) : []);
+    setRunHistory(Array.isArray(rawHistory) ? rawHistory.map(normalizeRunHistory) : []);
+    setNotifications(Array.isArray(rawNotifs) ? rawNotifs.map(normalizeNotification) : []);
+    setAiSuggestions(Array.isArray(rawAI) ? rawAI.map(normalizeAiSuggestion) : []);
+    setRoles(Array.isArray(rawRoles) ? rawRoles : []);
+    setPermissions(normalizePermissions(rawPerms || {}));
+    setQueryConfigs(Array.isArray(rawQueryConfigs) ? rawQueryConfigs : []);
+  }, [secureFetch, normalizeUser, normalizeException, normalizeAuditLog, normalizeRunHistory, normalizeNotification, normalizeAiSuggestion, normalizePermissions]);
 
   useEffect(() => {
     setPermissions(getDefaultPermissions());
@@ -188,9 +212,8 @@ export const AppProvider = ({ children }) => {
   }, []);
 
   const logAudit = async (action, type, detail, category) => {
-    await fetch(`${API_URL}/audit-logs`, {
+    await secureFetch(`${API_URL}/audit-logs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action, type, detail, category, user_name: user?.employeeId || 'System' })
     });
     fetchAll();
@@ -198,113 +221,134 @@ export const AppProvider = ({ children }) => {
 
   const fetchFilteredHistory = async (filters) => {
     const q = new URLSearchParams(filters).toString();
-    const res = await fetch(`${API_URL}/run-history?${q}`);
-    const data = await res.json();
+    const data = await secureFetch(`${API_URL}/run-history?${q}`);
     if (Array.isArray(data)) setRunHistory(data.map(normalizeRunHistory));
+    else setRunHistory([]);
   };
 
   const fetchFilteredExceptions = async (filters) => {
     const q = new URLSearchParams(filters).toString();
-    const res = await fetch(`${API_URL}/exceptions?${q}`);
-    const data = await res.json();
+    const data = await secureFetch(`${API_URL}/exceptions?${q}`);
     if (Array.isArray(data)) setExceptions(data.map(normalizeException));
+    else setExceptions([]);
   };
 
   const triggerReconRun = async (masterId, runDate, triggerType, manualData) => {
-    const res = await fetch(`${API_URL}/recon/trigger`, {
+    const data = await secureFetch(`${API_URL}/recon/trigger`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ masterId, runDate, triggerType, manualData })
     });
-    const data = await res.json();
-    if (res.ok) { 
+    if (data) { 
       await fetchAll(); 
-      // Force refresh for the specific run date to ensure immediate UI sync
       await fetchFilteredHistory({ date: runDate });
       await fetchFilteredExceptions({ date: runDate });
       return data; 
     }
-    throw new Error(data.error || 'Execution failed');
+    throw new Error('Execution failed');
   };
 
   const resolveException = async (id, remarks) => {
-    const res = await fetch(`${API_URL}/exceptions/${id}`, {
+    const data = await secureFetch(`${API_URL}/exceptions/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ remarks, status: 'Resolved' })
     });
-    if (res.ok) { fetchAll(); logAudit('Exception Resolved', 'Recon', `ID: ${id}`, 'System'); return true; }
+    if (data) { fetchAll(); logAudit('Exception Resolved', 'Recon', `ID: ${id}`, 'System'); return true; }
     return false;
   };
 
   const updateExceptionStatus = async (id, status) => {
-    const res = await fetch(`${API_URL}/exceptions/${id}`, {
+    const data = await secureFetch(`${API_URL}/exceptions/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status })
     });
-    if (res.ok) { fetchAll(); return true; }
+    if (data) { fetchAll(); return true; }
+    return false;
+  };
+
+  const flagException = async (id, remarks) => {
+    const data = await secureFetch(`${API_URL}/exceptions/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify({ remarks, status: 'Error' })
+    });
+    if (data) { fetchAll(); return true; }
     return false;
   };
 
   const addUser = async (userData) => {
-    const res = await fetch(`${API_URL}/users`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(userData) });
-    const data = await res.json();
-    if (res.ok) { fetchAll(); logAudit('User Provisioned', 'Identity', `${userData.name}`, 'Security'); return { success: true }; }
-    return { success: false, error: data.error };
+    const data = await secureFetch(`${API_URL}/users`, {
+      method: 'POST',
+      body: JSON.stringify(userData)
+    });
+    if (data) { fetchAll(); logAudit('User Provisioned', 'Identity', `${userData.name}`, 'Security'); return { success: true }; }
+    return { success: false };
   };
 
   const updateUser = async (id, userData) => {
-    const res = await fetch(`${API_URL}/users/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(userData) });
-    if (res.ok) { fetchAll(); logAudit('User Updated', 'Identity', `ID: ${id}`, 'Security'); return true; }
+    const data = await secureFetch(`${API_URL}/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(userData)
+    });
+    if (data) { fetchAll(); logAudit('User Updated', 'Identity', `ID: ${id}`, 'Security'); return true; }
     return false;
   };
 
   const deleteUser = async (id, name, employeeId) => {
-    const res = await fetch(`${API_URL}/users/${id}`, { method: 'DELETE' });
-    if (res.ok) { fetchAll(); logAudit('User Deleted', 'Identity', `${name} (${employeeId})`, 'Security'); return true; }
+    const data = await secureFetch(`${API_URL}/users/${id}`, { method: 'DELETE' });
+    if (data) { fetchAll(); logAudit('User Deleted', 'Identity', `${name} (${employeeId})`, 'Security'); return true; }
     return false;
   };
 
   const addMaster = async (masterData) => {
-    const res = await fetch(`${API_URL}/masters`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(masterData) });
-    if (res.ok) { fetchAll(); logAudit('Master Created', 'Recon', `Product ${masterData.name} added`, 'System'); return true; }
+    const data = await secureFetch(`${API_URL}/masters`, {
+      method: 'POST',
+      body: JSON.stringify(masterData)
+    });
+    if (data) { fetchAll(); logAudit('Master Created', 'Recon', `Product ${masterData.name} added`, 'System'); return true; }
     return false;
   };
 
   const updateMaster = async (id, masterData) => {
-    const res = await fetch(`${API_URL}/masters/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(masterData) });
-    if (res.ok) { fetchAll(); logAudit('Master Updated', 'Recon', `Product ${masterData.name} updated`, 'System'); return true; }
+    const data = await secureFetch(`${API_URL}/masters/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(masterData)
+    });
+    if (data) { fetchAll(); logAudit('Master Updated', 'Recon', `Product ${masterData.name} updated`, 'System'); return true; }
     return false;
   };
 
   const deleteMaster = async (id, name) => {
-    const res = await fetch(`${API_URL}/masters/${id}`, { method: 'DELETE' });
-    if (res.ok) { fetchAll(); logAudit('Master Deleted', 'Recon', `Product ${name} removed`, 'System'); return true; }
+    const data = await secureFetch(`${API_URL}/masters/${id}`, { method: 'DELETE' });
+    if (data) { fetchAll(); logAudit('Master Deleted', 'Recon', `Product ${name} removed`, 'System'); return true; }
     return false;
   };
 
   const addRole = async (roleData) => {
-    const res = await fetch(`${API_URL}/roles`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(roleData) });
-    if (res.ok) { fetchAll(); logAudit('Role Created', 'RBAC', `Role ${roleData.name} added`, 'Security'); return true; }
+    const data = await secureFetch(`${API_URL}/roles`, {
+      method: 'POST',
+      body: JSON.stringify(roleData)
+    });
+    if (data) { fetchAll(); logAudit('Role Created', 'RBAC', `Role ${roleData.name} added`, 'Security'); return true; }
     return false;
   };
 
   const updateRole = async (id, roleData) => {
-    const res = await fetch(`${API_URL}/roles/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(roleData) });
-    if (res.ok) { fetchAll(); logAudit('Role Updated', 'RBAC', `Role ${id} modified`, 'Security'); return true; }
+    const data = await secureFetch(`${API_URL}/roles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(roleData)
+    });
+    if (data) { fetchAll(); logAudit('Role Updated', 'RBAC', `Role ${id} modified`, 'Security'); return true; }
     return false;
   };
 
   const deleteRole = async (id, name) => {
-    const res = await fetch(`${API_URL}/roles/${id}`, { method: 'DELETE' });
-    if (res.ok) { fetchAll(); logAudit('Role Deleted', 'RBAC', `Role ${name} removed`, 'Security'); return true; }
+    const data = await secureFetch(`${API_URL}/roles/${id}`, { method: 'DELETE' });
+    if (data) { fetchAll(); logAudit('Role Deleted', 'RBAC', `Role ${name} removed`, 'Security'); return true; }
     return false;
   };
 
   const savePermission = async (module_name, role_name, is_allowed) => {
-    const res = await fetch(`${API_URL}/permissions`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ module_name, role_name, is_allowed }) });
-    if (res.ok) fetchAll();
+    const data = await secureFetch(`${API_URL}/permissions`, { method: 'POST', body: JSON.stringify({ module_name, role_name, is_allowed }) });
+    if (data) fetchAll();
   };
 
   const saveAllPermissions = async (perms) => {
@@ -318,28 +362,26 @@ export const AppProvider = ({ children }) => {
         });
       });
     });
-    const res = await fetch(`${API_URL}/permissions/bulk`, {
+    const data = await secureFetch(`${API_URL}/permissions/bulk`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ permissions: payload })
     });
-    if (res.ok) { fetchAll(); return true; }
+    if (data) { fetchAll(); return true; }
     return false;
   };
 
   const saveQueryConfig = async (configData) => {
-    const res = await fetch(`${API_URL}/query-configs`, {
+    const data = await secureFetch(`${API_URL}/query-configs`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(configData)
     });
-    if (res.ok) { fetchAll(); return true; }
+    if (data) { fetchAll(); return true; }
     return false;
   };
 
   const deleteQueryConfig = async (id) => {
-    const res = await fetch(`${API_URL}/query-configs/${id}`, { method: 'DELETE' });
-    if (res.ok) { fetchAll(); return true; }
+    const data = await secureFetch(`${API_URL}/query-configs/${id}`, { method: 'DELETE' });
+    if (data) { fetchAll(); return true; }
     return false;
   };
 

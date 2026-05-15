@@ -127,6 +127,7 @@ const RunRecon = () => {
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
   const [manualDataRows, setManualDataRows] = useState({});
+  const [isExecuting, setIsExecuting] = useState(false);
 
   const handleFileChange = async (sourceId, file) => {
     if (!file) return;
@@ -135,8 +136,14 @@ const RunRecon = () => {
     const formData = new FormData();
     formData.append('file', file);
     try {
+      const savedUser = localStorage.getItem('ab_recon_user');
+      const token = savedUser ? JSON.parse(savedUser).token : user?.token;
+
       const res = await fetch(`http://127.0.0.1:5001/api/recon/parse-file`, {
         method: 'POST',
+        headers: {
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: formData
       });
       const data = await res.json();
@@ -168,11 +175,13 @@ const RunRecon = () => {
       addNotification({ title: 'Execution Failed', message: e.message, type: 'error' });
     }
     setIsRunning(false);
+    setIsExecuting(false);
     setIsFinished(true);
   };
 
   const startEngine = () => {
-    if (!canExecute) return;
+    if (!canExecute || isExecuting) return;
+    setIsExecuting(true);
     finishTriggered.current = false;
     setIsFinished(false);
     setStepIndex(-1);
@@ -190,15 +199,26 @@ const RunRecon = () => {
 
   useEffect(() => {
     const fetchFilteredHistoryLocal = async () => {
-        let url = `http://127.0.0.1:5001/api/run-history?startDate=${startDateFilter}&endDate=${endDateFilter}`;
-        const res = await fetch(url);
-        const data = await res.json();
-        // Since useApp handles runHistory, we might need a local state or use the context one
-        // For simplicity in this edit, we assume runHistory in context is what we want to update
-        // but here we just use what's available
+        try {
+            const savedUser = localStorage.getItem('ab_recon_user');
+            const token = savedUser ? JSON.parse(savedUser).token : user?.token;
+            
+            let url = `http://127.0.0.1:5001/api/run-history?startDate=${startDateFilter}&endDate=${endDateFilter}`;
+            const res = await fetch(url, {
+                headers: {
+                    ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+                }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                // Local history fetch logic here if needed
+            }
+        } catch (err) {
+            console.error('Failed to fetch filtered history:', err);
+        }
     };
     if (startDateFilter || endDateFilter) fetchFilteredHistoryLocal();
-  }, [startDateFilter, endDateFilter]);
+  }, [startDateFilter, endDateFilter, user?.token]);
 
   const filteredHistory = (runHistory || []).filter(run => {
     if (!searchQuery) return true;
