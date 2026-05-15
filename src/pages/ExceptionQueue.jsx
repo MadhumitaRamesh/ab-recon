@@ -43,7 +43,7 @@ const ExceptionQueue = () => {
   const [isConfirmingManualMatch, setIsConfirmingManualMatch] = useState(false);
 
   // Filter states
-  const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
+  const [filterDate, setFilterDate] = useState('');
   const [filterProduct, setFilterProduct] = useState('All Products');
   const [filterType, setFilterType] = useState('All Types');
   const [filterPriority, setFilterPriority] = useState('All Priorities');
