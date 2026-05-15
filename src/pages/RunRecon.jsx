@@ -53,6 +53,13 @@ const RunRecon = () => {
   const [filterStatus, setFilterStatus] = useState('All Statuses');
   const [filterTrigger, setFilterTrigger] = useState('All Types');
 
+  // On mount: fetch ALL run history from DB so data persists after refresh/navigation
+  useEffect(() => {
+    fetchFilteredHistory({});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Re-fetch when filter controls change (user-applied filters)
   useEffect(() => {
     fetchFilteredHistory({
         date: filterDate,
@@ -61,6 +68,7 @@ const RunRecon = () => {
         triggerType: filterTrigger
     });
   }, [filterDate, filterProduct, filterStatus, filterTrigger]);
+
 
   const selectedMaster = (masters || []).find(m => String(m.id) === String(selectedMasterId));
 

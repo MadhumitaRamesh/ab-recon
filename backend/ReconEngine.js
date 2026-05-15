@@ -46,13 +46,48 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
                     throw new Error(`Column Mapping Error in ${sourceLabel}: Could not find reference/amount columns. Found: [${Object.keys(firstRow).join(', ')}]`);
                 }
 
-                sourceData[i] = provided.map(row => ({
+                // Auto-detect the date column name case-insensitively
+                const dateKey = Object.keys(firstRow).find(k =>
+                    /^(transaction[_\s]?date|date|txn[_\s]?date)$/i.test(k)
+                ) || null;
+
+                const allRows = provided.map(row => ({
                     amount: parseFloat(row[amtKey]) || 0,
                     reference_number: String(row[refKey] || '').trim(),
-                    transaction_date: row.transaction_date || row.date || row.Date || runDate
+                    transaction_date: dateKey ? String(row[dateKey] || '').trim() : runDate
                 })).filter(row => row.reference_number !== '');
 
-                totalRowsRead += provided.length;
+                // ── Bug 2 Fix: Filter to only rows matching the selected runDate ──
+                const normalizeDate = (val) => {
+                    if (!val) return '';
+                    const s = String(val).trim();
+                    if (/^\d{5}$/.test(s)) {
+                        const d = new Date(Math.round((parseFloat(s) - 25569) * 86400 * 1000));
+                        return d.toISOString().slice(0, 10);
+                    }
+                    const iso = new Date(s);
+                    if (!isNaN(iso)) return iso.toISOString().slice(0, 10);
+                    const parts = s.split(/[-\/]/);
+                    if (parts.length === 3) {
+                        const [a, b, c] = parts;
+                        if (c.length === 4) return `${c}-${b.padStart(2,'0')}-${a.padStart(2,'0')}`;
+                    }
+                    return s;
+                };
+
+                const targetDate = normalizeDate(runDate);
+                const dateFilteredRows = dateKey
+                    ? allRows.filter(row => normalizeDate(row.transaction_date) === targetDate)
+                    : allRows;
+
+                if (dateKey && dateFilteredRows.length === 0) {
+                    throw new Error(`No rows found in ${sourceLabel} for date ${runDate}. Check that your file contains a 'Date' or 'Transaction Date' column with matching dates.`);
+                }
+
+                sourceData[i] = dateFilteredRows;
+                // Bug 1 fix: count only the rows actually processed for the run date
+                totalRowsRead += dateFilteredRows.length;
+                console.log(`[ENGINE] ${sourceLabel}: ${provided.length} total rows in file → ${dateFilteredRows.length} rows matched date ${runDate}`);
 
             } else if (sourceType === 'API-Based') {
                 let apiResponse = manualData[i];

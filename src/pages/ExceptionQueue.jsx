@@ -71,13 +71,14 @@ const ExceptionQueue = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exceptionFilters?.runId]);
 
-  // Initial load only — not reactive to filter changes (avoids infinite loops)
+  // Initial load — fetch ALL exceptions from DB on mount so data persists after refresh/navigation
   useEffect(() => {
     if (!exceptionFilters?.runId) {
-      fetchFilteredExceptions(buildFilters());
+      fetchFilteredExceptions({});
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
 
   // Load AI suggestions when an exception is selected
   useEffect(() => {
