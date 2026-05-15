@@ -405,7 +405,7 @@ const ReconciliationTransactions = () => {
               <div>
                 <div style={{ padding: '12px 16px', background: 'rgba(37, 99, 235, 0.05)', borderRadius: '8px', marginBottom: '20px', border: '1px solid rgba(37, 99, 235, 0.1)', fontSize: '13px', color: '#1E40AF', fontWeight: '600' }}>
                   <Activity size={14} style={{ marginRight: '8px' }} /> 
-                  Showing all {selectedRecord.claim_amount} transactions. Matched records are verified by the system and summarized as Closed.
+                  Showing all {selectedRecord?.claim_amount || 0} transactions. Matched records are verified by the system and summarized as Closed.
                 </div>
                 <div className="responsive-table-container">
                   <table className="data-table">
@@ -413,17 +413,25 @@ const ReconciliationTransactions = () => {
                       <tr><th>ID / Ref</th><th>Type</th><th style={{ textAlign: 'right' }}>Amount</th><th>Status</th><th>Priority</th></tr>
                     </thead>
                     <tbody>
-                      {unifiedTransactions?.map((item, i) => (
-                        <tr key={i} style={{ opacity: item.isVirtual ? 0.7 : 1, background: item.isVirtual ? 'transparent' : '#FFF' }}>
-                          <td style={{ fontWeight: '700' }}>#{item.id || item.ref_no}</td>
-                          <td><span style={{ padding: '3px 8px', borderRadius: '4px', background: item.isVirtual ? '#F1F5F9' : '#FDF2F2', fontSize: '11px' }}>{item.type}</span></td>
-                          <td style={{ textAlign: 'right', fontWeight: '800' }}>{item.amount !== '-' ? `₹${Number(item.amount).toLocaleString('en-IN')}` : '-'}</td>
-                          <td><span style={{ fontWeight: '800', color: getStatusColor(item.status) }}>{item.status}</span></td>
-                          <td><span style={{ color: item.priority === 'High' ? '#DC2626' : '#94A3B8', fontWeight: '700' }}>{item.priority || 'N/A'}</span></td>
-                        </tr>
-                      ))}
+                      {Array.isArray(unifiedTransactions) && unifiedTransactions.map((item, i) => {
+                        const amt = (item?.amount !== '-' && item?.amount != null) 
+                          ? `₹${Number(item.amount).toLocaleString('en-IN')}` 
+                          : '-';
+                        return (
+                          <tr key={i} style={{ opacity: item?.isVirtual ? 0.7 : 1, background: item?.isVirtual ? 'transparent' : '#FFF' }}>
+                            <td style={{ fontWeight: '700' }}>#{item?.id || item?.ref_no || 'N/A'}</td>
+                            <td><span style={{ padding: '3px 8px', borderRadius: '4px', background: item?.isVirtual ? '#F1F5F9' : '#FDF2F2', fontSize: '11px' }}>{item?.type || 'Record'}</span></td>
+                            <td style={{ textAlign: 'right', fontWeight: '800' }}>{amt}</td>
+                            <td><span style={{ fontWeight: '800', color: getStatusColor(item?.status) }}>{item?.status || 'Unknown'}</span></td>
+                            <td><span style={{ color: item?.priority === 'High' ? '#DC2626' : '#94A3B8', fontWeight: '700' }}>{item?.priority || 'N/A'}</span></td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
+                  {(!unifiedTransactions || unifiedTransactions.length === 0) && (
+                    <div style={{ padding: '40px', textAlign: 'center', color: '#94A3B8' }}>No transaction records found for this batch.</div>
+                  )}
                 </div>
               </div>
             ) : (Array.isArray(detailData)) ? (
