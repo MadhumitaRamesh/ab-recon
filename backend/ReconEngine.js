@@ -21,36 +21,41 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
     try {
         await connection.beginTransaction();
 
-        // 1. Data Retrieval and Validation
-        for (const source of sources) {
+        // 1. Data Retrieval — keyed by source array index
+        for (let i = 0; i < sources.length; i++) {
+            const source = sources[i];
             const sourceType = (source.type || '').trim();
-            const sourceLabel = source.name || source.id;
+            const sourceLabel = source.name || `Source ${i}`;
             const mapping = source.mapping || { amount: 'amount', reference: 'reference_number' };
 
             if (sourceType === 'Manual Upload') {
-                const provided = manualData[source.id]; 
+                // Data is keyed by index from the frontend (RunRecon.jsx)
+                const provided = manualData[i];
                 if (!provided || provided.length === 0) {
-                    throw new Error(`Data missing for source: ${sourceLabel}`);
+                    throw new Error(`Data missing for source: ${sourceLabel}. Please upload a file for this source.`);
                 }
 
                 const firstRow = provided[0];
-                const hasAmt = mapping.amount in firstRow;
-                const hasRef = mapping.reference in firstRow;
+                // Auto-detect reference and amount columns (case-insensitive fallback)
+                const refKey = mapping.reference in firstRow ? mapping.reference
+                    : Object.keys(firstRow).find(k => /ref/i.test(k) || /reference/i.test(k)) || mapping.reference;
+                const amtKey = mapping.amount in firstRow ? mapping.amount
+                    : Object.keys(firstRow).find(k => /amount/i.test(k) || /amt/i.test(k)) || mapping.amount;
 
-                if (!hasAmt || !hasRef) {
-                    throw new Error(`Column Mapping Error in ${sourceLabel}: Expected headers [${mapping.amount}, ${mapping.reference}] not found in file.`);
+                if (!(refKey in firstRow) || !(amtKey in firstRow)) {
+                    throw new Error(`Column Mapping Error in ${sourceLabel}: Could not find reference/amount columns. Found: [${Object.keys(firstRow).join(', ')}]`);
                 }
 
-                sourceData[source.id] = provided.map(row => ({
-                    amount: parseFloat(row[mapping.amount]) || 0,
-                    reference_number: String(row[mapping.reference] || ''),
-                    transaction_date: row.transaction_date || runDate
-                }));
-                
+                sourceData[i] = provided.map(row => ({
+                    amount: parseFloat(row[amtKey]) || 0,
+                    reference_number: String(row[refKey] || '').trim(),
+                    transaction_date: row.transaction_date || row.date || row.Date || runDate
+                })).filter(row => row.reference_number !== '');
+
                 totalRowsRead += provided.length;
+
             } else if (sourceType === 'API-Based') {
-                let apiResponse = manualData[source.id];
-                
+                let apiResponse = manualData[i];
                 if (!apiResponse || apiResponse.length === 0) {
                     if (source.sampleResponse) {
                         try {
@@ -59,89 +64,175 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
                         } catch (e) { apiResponse = []; }
                     }
                 }
-
                 if (!apiResponse || apiResponse.length === 0) {
                     throw new Error(`API Data missing and no valid sample response found for: ${sourceLabel}`);
                 }
-
                 const apiMapping = source.apiMapping || [];
-                sourceData[source.id] = apiResponse.map(item => {
+                sourceData[i] = apiResponse.map(item => {
                     const mappedItem = {};
                     if (apiMapping.length > 0) {
-                        apiMapping.forEach(m => {
-                            if (m.apiField && m.dbColumn) mappedItem[m.dbColumn] = item[m.apiField];
-                        });
+                        apiMapping.forEach(m => { if (m.apiField && m.dbColumn) mappedItem[m.dbColumn] = item[m.apiField]; });
                     } else {
                         Object.assign(mappedItem, item);
                     }
-
                     return {
                         amount: parseFloat(mappedItem[mapping.amount] || item[mapping.amount]) || 0,
-                        reference_number: String(mappedItem[mapping.reference] || item[mapping.reference] || ''),
+                        reference_number: String(mappedItem[mapping.reference] || item[mapping.reference] || '').trim(),
                         transaction_date: mappedItem.transaction_date || item.transaction_date || runDate
                     };
-                });
-                
+                }).filter(row => row.reference_number !== '');
                 totalRowsRead += apiResponse.length;
             } else {
-                sourceData[source.id] = []; 
+                sourceData[i] = [];
             }
         }
 
-        const sourceIds = Object.keys(sourceData);
-        if (sourceIds.length < 1) throw new Error('Insufficient data sources.');
+        const sourceKeys = Object.keys(sourceData);
+        if (sourceKeys.length < 1) throw new Error('Insufficient data sources.');
 
-        const sourceA = sourceData[sourceIds[0]];
-        const sourceB = sourceIds.length >= 2 ? sourceData[sourceIds[1]] : [];
-        
+        const sourceA = sourceData[0] || [];
+        const sourceB = sourceData[1] || [];
+
         const results = [];
-        const bMap = new Map();
-
-        sourceB.forEach(txn => {
-            const key = `${txn.amount}|${txn.reference_number}`;
-            if (!bMap.has(key)) bMap.set(key, []);
-            bMap.get(key).push(txn);
-        });
-
         let matchedCount = 0;
         let exceptionCount = 0;
 
-        sourceA.forEach(txnA => {
-            const key = `${txnA.amount}|${txnA.reference_number}`;
-            const matches = bMap.get(key);
+        // ── Step 1: Detect duplicates within each source ──────────────────────
+        const countRefs = (rows) => {
+            const counts = new Map();
+            rows.forEach(r => counts.set(r.reference_number, (counts.get(r.reference_number) || 0) + 1));
+            return counts;
+        };
 
-            if (matches && matches.length > 0) {
-                matchedCount++;
-                results.push({
-                    run_id: runId, recon_master_id: masterConfig.id,
-                    amount: txnA.amount, reference_number: txnA.reference_number,
-                    result_type: 'Matched', transaction_date: txnA.transaction_date || runDate,
-                    status: 'Closed'
-                });
-                matches.shift();
-            } else {
+        const refCountA = countRefs(sourceA);
+        const refCountB = countRefs(sourceB);
+
+        const dupRefsA = new Set([...refCountA.entries()].filter(([, c]) => c > 1).map(([k]) => k));
+        const dupRefsB = new Set([...refCountB.entries()].filter(([, c]) => c > 1).map(([k]) => k));
+
+        // Track which rows have been handled
+        const handledA = new Set();
+        const handledB = new Set();
+
+        // ── Step 2: Build a ref → rows map for Source B ───────────────────────
+        const bByRef = new Map();
+        sourceB.forEach((txn, idx) => {
+            if (!bByRef.has(txn.reference_number)) bByRef.set(txn.reference_number, []);
+            bByRef.get(txn.reference_number).push({ ...txn, _idx: idx });
+        });
+
+        // ── Step 3: Match each Source A row ───────────────────────────────────
+        sourceA.forEach((txnA, idxA) => {
+            const ref = txnA.reference_number;
+
+            // Duplicate in Source A — flag and skip matching
+            if (dupRefsA.has(ref)) {
                 exceptionCount++;
                 results.push({
                     run_id: runId, recon_master_id: masterConfig.id,
-                    amount: txnA.amount, reference_number: txnA.reference_number,
-                    result_type: 'Exception', exception_type: 'Missing in Source B',
-                    transaction_date: txnA.transaction_date || runDate,
-                    status: 'Open'
+                    amount: txnA.amount, reference_number: ref,
+                    result_type: 'Exception', exception_type: 'Duplicate in Source A',
+                    detail: `Reference ${ref} appears ${refCountA.get(ref)} times in Source A`,
+                    transaction_date: txnA.transaction_date || runDate, status: 'Open'
                 });
+                handledA.add(idxA);
+                return;
+            }
+
+            const bMatches = bByRef.get(ref) || [];
+
+            if (bMatches.length === 0) {
+                // Reference exists in A but not in B
+                exceptionCount++;
+                results.push({
+                    run_id: runId, recon_master_id: masterConfig.id,
+                    amount: txnA.amount, reference_number: ref,
+                    result_type: 'Exception', exception_type: 'Missing in Source B',
+                    detail: `Reference ${ref} found in Source A but not in Source B`,
+                    transaction_date: txnA.transaction_date || runDate, status: 'Open'
+                });
+                handledA.add(idxA);
+
+            } else if (bMatches.length === 1) {
+                const txnB = bMatches[0];
+                handledA.add(idxA);
+                handledB.add(txnB._idx);
+
+                if (Math.abs(txnA.amount - txnB.amount) < 0.001) {
+                    // Exact match
+                    matchedCount++;
+                    results.push({
+                        run_id: runId, recon_master_id: masterConfig.id,
+                        amount: txnA.amount, reference_number: ref,
+                        result_type: 'Matched', transaction_date: txnA.transaction_date || runDate, status: 'Closed'
+                    });
+                } else {
+                    // Same ref, different amount → Amount Mismatch
+                    exceptionCount++;
+                    results.push({
+                        run_id: runId, recon_master_id: masterConfig.id,
+                        amount: txnA.amount, reference_number: ref,
+                        result_type: 'Exception', exception_type: 'Amount Mismatch',
+                        detail: `Source A: ${txnA.amount}, Source B: ${txnB.amount}`,
+                        transaction_date: txnA.transaction_date || runDate, status: 'Open'
+                    });
+                }
+
+            } else {
+                // 1-to-many: check if it's a 1-to-2 partial match (amounts sum to A)
+                const totalB = bMatches.reduce((sum, t) => sum + t.amount, 0);
+                handledA.add(idxA);
+                bMatches.forEach(t => handledB.add(t._idx));
+
+                if (bMatches.length === 2 && Math.abs(totalB - txnA.amount) < 0.001) {
+                    // Partial Match (1 → 2, amounts add up) — must be manually reviewed
+                    exceptionCount++;
+                    results.push({
+                        run_id: runId, recon_master_id: masterConfig.id,
+                        amount: txnA.amount, reference_number: ref,
+                        result_type: 'Exception', exception_type: 'Partial Match',
+                        detail: `1-to-2 split: Source A ${txnA.amount} vs Source B ${bMatches[0].amount} + ${bMatches[1].amount}`,
+                        transaction_date: txnA.transaction_date || runDate, status: 'Open'
+                    });
+                } else {
+                    // General 1-to-many mismatch
+                    exceptionCount++;
+                    results.push({
+                        run_id: runId, recon_master_id: masterConfig.id,
+                        amount: txnA.amount, reference_number: ref,
+                        result_type: 'Exception', exception_type: 'Amount Mismatch',
+                        detail: `Source A: ${txnA.amount}, Source B total (${bMatches.length} rows): ${totalB}`,
+                        transaction_date: txnA.transaction_date || runDate, status: 'Open'
+                    });
+                }
             }
         });
 
-        bMap.forEach(remaining => {
-            remaining.forEach(txnB => {
+        // ── Step 4: Source B rows with no match in Source A ───────────────────
+        sourceB.forEach((txnB, idxB) => {
+            if (handledB.has(idxB)) return;
+
+            // Duplicate in Source B
+            if (dupRefsB.has(txnB.reference_number)) {
+                exceptionCount++;
+                results.push({
+                    run_id: runId, recon_master_id: masterConfig.id,
+                    amount: txnB.amount, reference_number: txnB.reference_number,
+                    result_type: 'Exception', exception_type: 'Duplicate in Source B',
+                    detail: `Reference ${txnB.reference_number} appears ${refCountB.get(txnB.reference_number)} times in Source B`,
+                    transaction_date: txnB.transaction_date || runDate, status: 'Open'
+                });
+            } else {
+                // Missing in Source A
                 exceptionCount++;
                 results.push({
                     run_id: runId, recon_master_id: masterConfig.id,
                     amount: txnB.amount, reference_number: txnB.reference_number,
                     result_type: 'Exception', exception_type: 'Missing in Source A',
-                    transaction_date: txnB.transaction_date || runDate,
-                    status: 'Open'
+                    detail: `Reference ${txnB.reference_number} found in Source B but not in Source A`,
+                    transaction_date: txnB.transaction_date || runDate, status: 'Open'
                 });
-            });
+            }
         });
 
         const endTime = new Date();
@@ -169,10 +260,15 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
 
             const exceptionsOnly = results.filter(r => r.result_type === 'Exception');
             if (exceptionsOnly.length > 0) {
+                const priorityFor = (type) => {
+                    if (type === 'Amount Mismatch' || type === 'Partial Match') return 'High';
+                    if (type === 'Duplicate in Source A' || type === 'Duplicate in Source B') return 'Medium';
+                    return 'High'; // Missing entries
+                };
                 const exValues = exceptionsOnly.map((e, idx) => [
                     `EX-${runId}-${idx + 1}`, e.amount, e.reference_number,
-                    e.exception_type || 'Mismatch', '0 days', 'High', 'Pending',
-                    masterConfig.id, runId, runDate, 'System', e.reference_number, 'Operations'
+                    e.exception_type || 'Mismatch', '0 days', priorityFor(e.exception_type), 'Open',
+                    masterConfig.id, runId, runDate, 'System', e.detail || e.reference_number, 'Operations'
                 ]);
                 await connection.query(
                     'INSERT INTO exceptions (id, amount, ref_no, type, age, priority, status, recon_master_id, run_id, run_date, source_type, unique_reference_number, assigned_role) VALUES ?',
