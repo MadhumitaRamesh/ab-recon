@@ -917,10 +917,19 @@ app.get('/api/recon-transactions/:batchId/refund', (req, res) => {
 app.get('/api/recon-transactions/:batchId/transactions', (req, res) => {
     const { batchId } = req.params;
     const sql = `
-        SELECT e.*, m.name AS master_name 
-        FROM exceptions e
-        LEFT JOIN masters m ON e.recon_master_id = m.id
-        WHERE e.run_id = ?
+        SELECT 
+            rr.id,
+            rr.reference_number AS ref_no,
+            e.unique_reference_number,
+            rr.amount,
+            rr.result_type AS type,
+            COALESCE(e.type, rr.exception_type, IF(rr.result_type = 'Exception', 'Amount Mismatch', 'Matched')) AS exception_type,
+            rr.status,
+            COALESCE(e.priority, IF(rr.result_type = 'Exception', 'High', 'Low')) AS priority
+        FROM recon_results rr
+        LEFT JOIN exceptions e ON e.run_id = rr.run_id AND e.ref_no = rr.reference_number
+        WHERE rr.run_id = ?
+        ORDER BY rr.result_type DESC, rr.id ASC
     `;
     db.query(sql, [batchId], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });

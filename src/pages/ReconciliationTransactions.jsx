@@ -353,30 +353,38 @@ const ReconciliationTransactions = () => {
                   </table>
                 </div>
 
-                <h4 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', color: '#1E293B' }}>EXCEPTION TRANSACTIONS</h4>
+                <h4 style={{ fontSize: '15px', fontWeight: '800', marginBottom: '16px', color: '#1E293B' }}>ALL TRANSACTIONS</h4>
                 <div className="responsive-table-container">
                   <table className="data-table">
                     <thead>
                       <tr>
-                        <th>Exception ID</th>
+                        <th>ID</th>
                         <th>Reference No</th>
                         <th>Unique Reference No</th>
                         <th>Amount</th>
-                        <th>Exception Type</th>
+                        <th>Type</th>
                         <th>Status</th>
                         <th>Priority</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {exceptionsData.length > 0 ? exceptionsData.map((ex, i) => (
-                        <tr key={i}>
-                          <td style={{ fontWeight: '800', color: 'var(--primary)' }}>#{ex.id}</td>
-                          <td style={{ fontWeight: '600' }}>{ex.ref_no || 'N/A'}</td>
-                          <td style={{ fontSize: '12px', color: '#64748B' }}>{ex.unique_reference_number || 'N/A'}</td>
-                          <td style={{ fontWeight: '800' }}>₹{Number(ex.amount || 0).toLocaleString('en-IN')}</td>
-                          <td><span style={{ padding: '4px 8px', background: '#FEF2F2', color: '#DC2626', borderRadius: '6px', fontSize: '11px', fontWeight: '700' }}>{ex.type || 'Exception'}</span></td>
-                          <td><span style={{ fontWeight: '800', color: getStatusColor(ex.status) }}>{ex.status}</span></td>
-                          <td><span style={{ color: ex.priority === 'High' ? '#DC2626' : '#94A3B8', fontWeight: '700' }}>{ex.priority || (ex.type === 'Exception' ? 'High' : 'Low')}</span></td>
+                      {exceptionsData.length > 0 ? exceptionsData.map((row, i) => (
+                        <tr key={i} style={{ background: row.type === 'Matched' ? 'rgba(5,150,105,0.03)' : 'rgba(220,38,38,0.03)' }}>
+                          <td style={{ fontWeight: '800', color: 'var(--primary)' }}>#{row.id}</td>
+                          <td style={{ fontWeight: '600' }}>{row.ref_no || 'N/A'}</td>
+                          <td style={{ fontSize: '12px', color: '#64748B' }}>{row.unique_reference_number || 'N/A'}</td>
+                          <td style={{ fontWeight: '800' }}>₹{Number(row.amount || 0).toLocaleString('en-IN')}</td>
+                          <td>
+                            <span style={{ 
+                              padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700',
+                              background: row.type === 'Matched' ? '#ECFDF5' : '#FEF2F2',
+                              color: row.type === 'Matched' ? '#059669' : '#DC2626'
+                            }}>
+                              {row.type === 'Matched' ? 'Matched' : (row.exception_type || 'Exception')}
+                            </span>
+                          </td>
+                          <td><span style={{ fontWeight: '800', color: getStatusColor(row.status) }}>{row.status}</span></td>
+                          <td><span style={{ color: row.priority === 'High' ? '#DC2626' : '#059669', fontWeight: '700' }}>{row.priority || (row.type === 'Matched' ? 'Low' : 'High')}</span></td>
                         </tr>
                       )) : (
                         <tr>
