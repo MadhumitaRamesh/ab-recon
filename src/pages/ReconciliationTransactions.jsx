@@ -15,6 +15,13 @@ import {
   X
 } from 'lucide-react';
 
+const safeJsonParse = (str) => {
+    if (!str) return null;
+    if (typeof str === 'object') return str;
+    try { return JSON.parse(str); }
+    catch (e) { return null; }
+};
+
 const ReconciliationTransactions = () => {
   const { searchQuery, setSearchQuery } = useApp();
   const [level, setLevel] = useState(1); // 1: Selection, 2: List, 3: Detail
@@ -350,7 +357,7 @@ const ReconciliationTransactions = () => {
                       <tr><th>Source Entity</th><th>Type</th><th>Validation Point</th></tr>
                     </thead>
                     <tbody>
-                      {detailData.source_config?.map((src, i) => (
+                      {safeJsonParse(detailData.source_config)?.map((src, i) => (
                         <tr key={i}>
                           <td style={{ fontWeight: '700' }}>{src.name}</td>
                           <td><span style={{ padding: '4px 8px', background: '#F1F5F9', borderRadius: '4px', fontSize: '12px' }}>{src.type}</span></td>

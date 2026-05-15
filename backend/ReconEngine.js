@@ -147,12 +147,13 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
         const endTime = new Date();
 
         // 3. Finalize Run (Atomic Transaction)
+        const toMySQLDate = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
         await connection.query(
             'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time, total_rows, valid_rows, file_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [runId, masterConfig.name, 'Completed', triggerType, matchedCount, exceptionCount, runDate, 
              endTime.toLocaleTimeString('en-GB', { hour12: false }), 
-             startTime.toISOString(), 
-             endTime.toISOString(), 
+             toMySQLDate(startTime), 
+             toMySQLDate(endTime), 
              totalRowsRead, results.length, fileName]
         );
 
@@ -197,8 +198,8 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
                     'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time, total_rows, valid_rows, file_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     [runId, masterConfig.name, 'Failed', triggerType, 0, 0, runDate, 
                      new Date().toLocaleTimeString('en-GB', { hour12: false }), 
-                     startTime.toISOString(), 
-                     new Date().toISOString(), 
+                     startTime.toISOString().slice(0, 19).replace('T', ' '), 
+                     new Date().toISOString().slice(0, 19).replace('T', ' '), 
                      totalRowsRead, 0, fileName]
                 );
                 await connection.query(
