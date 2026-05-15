@@ -58,6 +58,18 @@ const AuditLog = () => {
     }
   };
 
+  const toIST = (utcString) => {
+    if (!utcString) return '-';
+    const date = new Date(utcString);
+    return date.toLocaleTimeString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  };
+
   const getTypeStyle = (type) => {
     switch(type) {
       case 'Security': return { color: '#DC2626', background: '#FEF2F2' };
@@ -129,7 +141,7 @@ const AuditLog = () => {
                 <tr key={log.id} className="hover-scale" style={{ transition: 'background 0.2s ease' }}>
                   <td style={{ whiteSpace: 'nowrap', fontSize: '13px', color: '#64748B', fontWeight: '500' }}>
                     <div style={{ fontWeight: '700', color: '#1E293B' }}>{log.date}</div>
-                    <div>{log.time}</div>
+                    <div>{toIST(log.log_time)}</div>
                   </td>
                   <td style={{ fontWeight: '700', color: '#1E293B' }}>{log.user}</td>
                   <td style={{ fontWeight: '600' }}>{log.action}</td>

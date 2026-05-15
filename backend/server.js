@@ -466,7 +466,9 @@ app.post('/api/audit-logs', (req, res) => {
 
 // --- RUN HISTORY ---
 app.get('/api/run-history', async (req, res) => {
+    console.log('>>> HISTORY FETCH HIT | Filters:', JSON.stringify(req.query));
     const { startDate, endDate, date, master, status, triggerType } = req.query;
+
     try {
         let sql = 'SELECT * FROM run_history WHERE 1=1';
         const params = [];
@@ -479,6 +481,8 @@ app.get('/api/run-history', async (req, res) => {
         
         sql += ' ORDER BY run_date DESC, run_time DESC LIMIT 100';
         const [rows] = await db.promise().query(sql, params);
+        console.log(`>>> HISTORY FETCH SUCCESS | Count: ${rows.length}`);
+
         
         // Map fields for frontend compatibility
         const mapped = rows.map(r => ({
@@ -525,19 +529,28 @@ app.post('/api/recon/parse-file', tempUpload.single('file'), (req, res) => {
 });
 
 app.post('/api/run-history', checkRole(['Admin', 'Ops_Maker']), (req, res) => {
+    console.log('>>> RUN SAVE ENDPOINT HIT | Body:', JSON.stringify(req.body));
     const { id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time } = req.body;
+
     db.query(
         'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
         [id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time],
         (err) => {
-            if (err) return res.status(500).json({ error: err.message });
+            if (err) {
+                console.error('>>> RUN SAVE SQL ERROR:', err.message);
+                return res.status(500).json({ error: err.message });
+            }
+            console.log('>>> RUN SAVE SUCCESS');
             res.json({ success: true });
         }
+
     );
 });
 
 app.post('/api/recon/trigger', async (req, res) => {
+    console.log('>>> RECON TRIGGER ENDPOINT HIT | Body:', JSON.stringify(req.body));
     // RBAC temporarily disabled for debugging preflight issues
+
     const { masterId, runDate, triggerType, manualData } = req.body;
     console.log(`[API] Recon Triggered | Master: ${masterId} | Date: ${runDate} | Type: ${triggerType}`);
     

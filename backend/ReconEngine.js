@@ -6,7 +6,13 @@ const XLSX = require('xlsx');
  * Performs dynamic, config-driven matching based on Recon Master settings.
  */
 async function runReconciliation(masterConfig, runDate, triggerType, manualData = {}) {
-    const startTime = new Date();
+    const getISTTime = () => {
+        const now = new Date();
+        const ist = new Date(now.getTime() + (5.5 * 60 * 60 * 1000));
+        return ist.toISOString().replace('T', ' ').substring(0, 19);
+    };
+
+    const startTime = getISTTime();
     const runId = `RUN-${Math.floor(Math.random() * 89999) + 10000}`;
     const connection = await db.promise().getConnection();
     
@@ -57,37 +63,45 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
                     transaction_date: dateKey ? String(row[dateKey] || '').trim() : runDate
                 })).filter(row => row.reference_number !== '');
 
-                // ── Bug 2 Fix: Filter to only rows matching the selected runDate ──
-                const normalizeDate = (val) => {
-                    if (!val) return '';
+                // --- Bug 1 Fix: Normalize and compare year, month, day as numbers ---
+                const parseToDate = (val) => {
+                    if (!val) return null;
                     const s = String(val).trim();
                     if (/^\d{5}$/.test(s)) {
-                        const d = new Date(Math.round((parseFloat(s) - 25569) * 86400 * 1000));
-                        return d.toISOString().slice(0, 10);
+                        return new Date(Math.round((parseFloat(s) - 25569) * 86400 * 1000));
                     }
-                    const iso = new Date(s);
-                    if (!isNaN(iso)) return iso.toISOString().slice(0, 10);
+                    // Try direct parse
+                    let d = new Date(s);
+                    if (!isNaN(d.getTime())) return d;
+                    // Handle DD/MM/YYYY or DD-MM-YYYY
                     const parts = s.split(/[-\/]/);
                     if (parts.length === 3) {
                         const [a, b, c] = parts;
-                        if (c.length === 4) return `${c}-${b.padStart(2,'0')}-${a.padStart(2,'0')}`;
+                        if (c.length === 4) return new Date(`${c}-${b}-${a}`); // YYYY-MM-DD
+                        if (a.length === 4) return new Date(`${a}-${b}-${c}`); // YYYY-MM-DD
                     }
-                    return s;
+                    return null;
                 };
 
-                const targetDate = normalizeDate(runDate);
+                const targetDate = parseToDate(runDate);
                 const dateFilteredRows = dateKey
-                    ? allRows.filter(row => normalizeDate(row.transaction_date) === targetDate)
+                    ? allRows.filter(row => {
+                        const rowDate = parseToDate(row[dateKey]);
+                        if (!targetDate || !rowDate) return false;
+                        return rowDate.getFullYear() === targetDate.getFullYear() &&
+                               rowDate.getMonth() === targetDate.getMonth() &&
+                               rowDate.getDate() === targetDate.getDate();
+                    })
                     : allRows;
 
                 if (dateKey && dateFilteredRows.length === 0) {
-                    throw new Error(`No rows found in ${sourceLabel} for date ${runDate}. Check that your file contains a 'Date' or 'Transaction Date' column with matching dates.`);
+                    console.log(`[ENGINE] No rows for ${runDate} in ${sourceLabel}. Sample row date value:`, provided[0]?.[dateKey]);
+                    throw new Error(`No rows found in ${sourceLabel} for date ${runDate}. Check your file's date column.`);
                 }
 
                 sourceData[i] = dateFilteredRows;
-                // Bug 1 fix: count only the rows actually processed for the run date
                 totalRowsRead += dateFilteredRows.length;
-                console.log(`[ENGINE] ${sourceLabel}: ${provided.length} total rows in file → ${dateFilteredRows.length} rows matched date ${runDate}`);
+                console.log(`>>> ENGINE: ${sourceLabel} | Filtered Rows: ${dateFilteredRows.length} (out of ${provided.length} total) for date ${runDate}`);
 
             } else if (sourceType === 'API-Based') {
                 let apiResponse = manualData[i];
@@ -270,18 +284,22 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
             }
         });
 
-        const endTime = new Date();
+        const endTime = getISTTime();
 
         // 3. Finalize Run (Atomic Transaction)
-        const toMySQLDate = (d) => d.toISOString().slice(0, 19).replace('T', ' ');
+        console.log(`>>> ENGINE: SAVING RUN HISTORY | ID: ${runId} | Product: ${masterConfig.name} | Date: ${runDate}`);
+        
         await connection.query(
             'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time, total_rows, valid_rows, file_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [runId, masterConfig.name, 'Completed', triggerType, matchedCount, exceptionCount, runDate, 
-             endTime.toLocaleTimeString('en-GB', { hour12: false }), 
-             toMySQLDate(startTime), 
-             toMySQLDate(endTime), 
+             new Date().toLocaleTimeString('en-GB', { hour12: false }), 
+             startTime, 
+             endTime, 
              totalRowsRead, results.length, fileName]
         );
+
+
+        console.log(`>>> ENGINE: RUN HISTORY SAVED SUCCESS | ID: ${runId}`);
 
         if (results.length > 0) {
             const values = results.map(r => [
@@ -325,14 +343,18 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
         if (connection) {
             await connection.rollback();
             try {
+                const nowIST = getISTTime();
+
                 await connection.query(
                     'INSERT INTO run_history (id, product, status, trigger_type, matched_count, exception_count, run_date, run_time, start_time, end_time, total_rows, valid_rows, file_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                     [runId, masterConfig.name, 'Failed', triggerType, 0, 0, runDate, 
                      new Date().toLocaleTimeString('en-GB', { hour12: false }), 
-                     startTime.toISOString().slice(0, 19).replace('T', ' '), 
-                     new Date().toISOString().slice(0, 19).replace('T', ' '), 
+                     startTime, 
+                     nowIST, 
                      totalRowsRead, 0, fileName]
                 );
+
+
                 await connection.query(
                     'INSERT INTO audit_logs (user_name, action, module, detail, log_time, log_date, type, forensic_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
                     ['System', 'Recon Failed', masterConfig.name, `Batch ${runId} failed: ${err.message}`, 

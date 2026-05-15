@@ -71,13 +71,31 @@ const ExceptionQueue = () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exceptionFilters?.runId]);
 
-  // Initial load — fetch ALL exceptions from DB on mount so data persists after refresh/navigation
+  // Initial load — fetch ALL exceptions from DB on mount using direct fetch pattern
   useEffect(() => {
-    if (!exceptionFilters?.runId) {
-      fetchFilteredExceptions({});
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    const fetchExceptions = async () => {
+      if (exceptionFilters?.runId) return;
+      try {
+        const saved = localStorage.getItem('ab_recon_user');
+        const token = saved ? JSON.parse(saved).token : '';
+        
+        const res = await fetch('http://127.0.0.1:5001/api/exceptions', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (!res.ok) throw new Error('Failed to fetch');
+        const data = await res.json();
+        setExceptions(Array.isArray(data) ? data.map(normalizeException) : []);
+      } catch (err) {
+        console.error('Exceptions fetch error:', err);
+        setExceptions([]);
+      }
+    };
+    fetchExceptions();
+  }, [exceptionFilters?.runId]);
+
 
 
   // Load AI suggestions when an exception is selected

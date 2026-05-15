@@ -30,7 +30,8 @@ const RunRecon = () => {
     setActivePage, 
     setExceptionFilters,
     searchQuery,
-    fetchAll
+    fetchAll,
+    setRefreshTrigger
   } = useApp();
   const [selectedMasterId, setSelectedMasterId] = useState('');
   const getLocalDate = () => {
@@ -48,16 +49,39 @@ const RunRecon = () => {
   const finishTriggered = useRef(false);
 
   // Filter states for history
-  const [filterDate, setFilterDate] = useState(getLocalDate());
+  const [filterDate, setFilterDate] = useState('');
   const [filterProduct, setFilterProduct] = useState('All Products');
   const [filterStatus, setFilterStatus] = useState('All Statuses');
   const [filterTrigger, setFilterTrigger] = useState('All Types');
 
-  // On mount: fetch ALL run history from DB so data persists after refresh/navigation
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // On mount: fetch ALL run history from DB using direct fetch pattern for reliability
   useEffect(() => {
-    fetchFilteredHistory({});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    const fetchHistory = async () => {
+      try {
+        const saved = localStorage.getItem('ab_recon_user');
+        const token = saved ? JSON.parse(saved).token : '';
+        
+        const res = await fetch('http://127.0.0.1:5001/api/run-history', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        });
+        if (!res.ok) throw new Error('Failed to fetch');
+        const data = await res.json();
+        // Since we are in RunRecon, we should ideally use the context's setRunHistory
+        // but for this direct pattern we assume we just want to ensure it works
+        setRunHistory(Array.isArray(data) ? data.map(normalizeRunHistory) : []);
+      } catch (err) {
+        console.error('Run history fetch error:', err);
+        setRunHistory([]);
+      }
+    };
+    fetchHistory();
   }, []);
+
 
   // Re-fetch when filter controls change (user-applied filters)
   useEffect(() => {
@@ -86,6 +110,18 @@ const RunRecon = () => {
     setTerminalLogs(['> System Standby. Waiting for execution trigger...']);
     setIsFinished(false);
   }, [selectedMasterId]);
+
+  const toIST = (utcString) => {
+    if (!utcString) return '-';
+    const date = new Date(utcString);
+    return date.toLocaleTimeString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false
+    });
+  };
 
   const manualSources = selectedMaster?.source_config
     ?.map((s, i) => ({ ...s, _idx: i }))
@@ -119,15 +155,15 @@ const RunRecon = () => {
       }, delay);
     } else if (isRunning && stepIndex === sequence.length && !finishTriggered.current) {
       finishTriggered.current = true;
-      setTimeout(() => finalizeRun(), 500);
+      // Removed automatic finalizeRun call from useEffect as per instruction
     }
     return () => clearTimeout(timer);
   }, [isRunning, stepIndex, selectedMaster]);
 
+
   const [startDateFilter, setStartDateFilter] = useState('');
   const [endDateFilter, setEndDateFilter] = useState('');
   const [manualDataRows, setManualDataRows] = useState({});
-  const [isExecuting, setIsExecuting] = useState(false);
 
   const handleFileChange = async (sourceId, file) => {
     if (!file) return;
@@ -166,27 +202,58 @@ const RunRecon = () => {
         .map(([, f]) => f.name)
         .join(' | ');
 
-      const result = await triggerReconRun(selectedMaster.id, runDate, selectedMaster.run_mode || 'Manual', {
-          ...manualDataRows,
-          fileName: fileNames
-      });
+      const savedUser = localStorage.getItem('ab_recon_user');
+      const token = savedUser ? JSON.parse(savedUser).token : '';
+      const payload = {
+        ...manualDataRows,
+        fileName: fileNames
+      };
+
+      console.log('>>> TRIGGERING RECON RUN');
+      console.log('URL: http://127.0.0.1:5001/api/recon/trigger');
+      console.log('TOKEN:', token ? `Bearer ${token.substring(0, 10)}...` : 'NONE');
+      console.log('BODY:', JSON.stringify({ masterId: selectedMaster.id, runDate, triggerType: selectedMaster.run_mode || 'Manual', manualData: payload }));
+
+      const result = await triggerReconRun(selectedMaster.id, runDate, selectedMaster.run_mode || 'Manual', payload);
       addNotification({ title: 'Success', message: `Run ${result.runId} completed.` });
+      
+      // Refresh history and trigger dashboard update
+      fetchFilteredHistory({
+        date: filterDate,
+        master: filterProduct,
+        status: filterStatus,
+        triggerType: filterTrigger
+      });
+      setRefreshTrigger(prev => prev + 1);
+
+      setIsSubmitting(false);
     } catch (e) {
+      console.error('>>> RECON TRIGGER ERROR:', e);
       addNotification({ title: 'Execution Failed', message: e.message, type: 'error' });
+      setIsSubmitting(false);
     }
     setIsRunning(false);
-    setIsExecuting(false);
     setIsFinished(true);
   };
 
-  const startEngine = () => {
-    if (!canExecute || isExecuting) return;
-    setIsExecuting(true);
+
+  const startEngine = async () => {
+    console.log('>>> startEngine called', { canExecute, isSubmitting, selectedMaster: selectedMaster?.name, missingFilesCount: missingFiles.length });
+    if (!canExecute || isSubmitting) return;
+    setIsSubmitting(true);
+    
     finishTriggered.current = false;
     setIsFinished(false);
     setStepIndex(-1);
     setIsRunning(true);
+
+    // Call finalizeRun manually after the sequence/animation duration
+    // (Simulating the 5.5s total delay of the sequence)
+    setTimeout(() => {
+      finalizeRun();
+    }, 5500);
   };
+
 
   const handleViewExceptions = (runId) => {
     setExceptionFilters({ runId });
@@ -523,8 +590,8 @@ const RunRecon = () => {
                   <td><span className={`status-pill ${run.status === 'Completed' ? 'status-success' : 'status-danger'}`}>{run.status}</span></td>
                   <td><span style={{ fontWeight: '800', color: '#10B981' }}>{run.matched}</span></td>
                   <td><span style={{ fontWeight: '800', color: Number(run.exceptions) > 0 ? '#DC2626' : '#64748B' }}>{run.exceptions}</span></td>
-                  <td><div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B' }}>{run.startTime}</div></td>
-                  <td><div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B' }}>{run.endTime}</div></td>
+                  <td><div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B' }}>{toIST(run.start_time)}</div></td>
+                  <td><div style={{ fontSize: '12px', fontWeight: '600', color: '#64748B' }}>{toIST(run.end_time)}</div></td>
                   <td style={{ textAlign: 'right' }}>
                     <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
                       <button 

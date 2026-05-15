@@ -21,9 +21,15 @@ const getLocalDate = () => {
 };
 
 const Dashboard = () => {
-  const { setActivePage, addNotification, fetchFilteredHistory, fetchFilteredExceptions, runHistory, exceptions, masters } = useApp();
+  const { setActivePage, addNotification, fetchFilteredHistory, fetchFilteredExceptions, runHistory, exceptions, masters, refreshTrigger } = useApp();
   const [isSyncing, setIsSyncing] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(getLocalDate());
+  const [selectedDate, setSelectedDate] = useState('');
+
+  useEffect(() => {
+    if (refreshTrigger > 0) {
+      handleManualSync();
+    }
+  }, [refreshTrigger]);
 
   const allRuns = Array.isArray(runHistory) ? runHistory : [];
   const allExceptions = Array.isArray(exceptions) ? exceptions : [];
@@ -68,7 +74,7 @@ const Dashboard = () => {
 
   // --- DAILY SUMMARY (date-filtered, for the table below) ---
   const dailyRuns = useMemo(() =>
-    allRuns.filter(run => run && run.rawDate === selectedDate)
+    allRuns.filter(run => run && (!selectedDate || run.rawDate === selectedDate))
   , [allRuns, selectedDate]);
 
   const summary = useMemo(() => {

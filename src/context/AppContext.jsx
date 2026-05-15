@@ -20,6 +20,7 @@ export const AppProvider = ({ children }) => {
   const [queryConfigs, setQueryConfigs] = useState([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [exceptionFilters, setExceptionFilters] = useState({ runId: '', masterId: '' });
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const setActivePage = (page) => {
     setSearchQuery(''); // Clear search on page change for better UX
@@ -87,6 +88,8 @@ export const AppProvider = ({ children }) => {
       exceptions: Number(r.exception_count || 0).toLocaleString('en-IN'),
       startTime: formatTime(r.start_time),
       endTime: formatTime(r.end_time),
+      start_time: r.start_time,
+      end_time: r.end_time,
       matchedAmount: r.matched_amount || 0,
       exceptionAmount: r.exception_amount || 0,
       claimAmount: r.claim_amount || 0,
@@ -101,7 +104,8 @@ export const AppProvider = ({ children }) => {
     return {
       id: l.id, action: l.action, user: l.user_name, detail: l.detail, type: l.type,
       date: d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }),
-      time: d.toLocaleTimeString(), hash: l.forensic_hash
+      time: d.toLocaleTimeString(), hash: l.forensic_hash,
+      log_time: l.log_time
     };
   }, []);
 
@@ -173,9 +177,9 @@ export const AppProvider = ({ children }) => {
     const [rawUsers, rawMasters, rawExceptions, rawAudit, rawHistory, rawNotifs, rawAI, rawPerms, rawRoles, rawQueryConfigs] = await Promise.all([
       secureFetch(`${API_URL}/users`),
       secureFetch(`${API_URL}/masters`),
-      secureFetch(`${API_URL}/exceptions?date=${localToday}`),
+      secureFetch(`${API_URL}/exceptions`),
       secureFetch(`${API_URL}/audit-logs`),
-      secureFetch(`${API_URL}/run-history?date=${localToday}`),
+      secureFetch(`${API_URL}/run-history`),
       secureFetch(`${API_URL}/notifications`),
       secureFetch(`${API_URL}/ai-suggestions`),
       secureFetch(`${API_URL}/permissions`),
@@ -234,6 +238,7 @@ export const AppProvider = ({ children }) => {
   };
 
   const triggerReconRun = async (masterId, runDate, triggerType, manualData) => {
+    console.log('>>> CONTEXT: triggerReconRun called', { masterId, runDate, triggerType });
     const data = await secureFetch(`${API_URL}/recon/trigger`, {
       method: 'POST',
       body: JSON.stringify({ masterId, runDate, triggerType, manualData })
@@ -439,6 +444,7 @@ export const AppProvider = ({ children }) => {
       users, setUsers, addUser, updateUser, deleteUser,
       auditLogs, setAuditLogs, logAudit,
       runHistory, fetchFilteredHistory,
+      refreshTrigger, setRefreshTrigger,
       fetchFilteredExceptions, triggerReconRun,
       notifications, addNotification, markAllAsRead,
       queryConfigs, saveQueryConfig, deleteQueryConfig,
