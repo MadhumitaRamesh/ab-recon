@@ -22,7 +22,8 @@ const ExceptionQueue = () => {
     fetchSuggestions,
     exceptionFilters,
     setExceptionFilters,
-    searchQuery
+    searchQuery,
+    user
   } = useApp();
   
   const [selectedEx, setSelectedEx] = useState(null);
@@ -35,6 +36,11 @@ const ExceptionQueue = () => {
   const [showRemarksModal, setShowRemarksModal] = useState(false);
   const [remarks, setRemarks] = useState('');
   const [pendingStatus, setPendingStatus] = useState('');
+
+  // Manual Match Modal State
+  const [showManualMatchModal, setShowManualMatchModal] = useState(false);
+  const [manualMatchEx, setManualMatchEx] = useState(null);
+  const [isConfirmingManualMatch, setIsConfirmingManualMatch] = useState(false);
 
   // Filter states
   const [filterDate, setFilterDate] = useState(new Date().toISOString().split('T')[0]);
@@ -158,6 +164,60 @@ const ExceptionQueue = () => {
     if (success) {
       addNotification({ title: 'Match Confirmed & Closed', message: `Transaction ${selectedEx.id} matched with ${candidate.candidateId}.` });
       setSelectedEx(null);
+    }
+  };
+
+  // ── MANUAL MATCH HANDLER (Partial Match only) ──────────────────────────────
+  const parsePartialMatchDetail = (ex) => {
+    // Detail format: "1-to-2 split: Source A 500 vs Source B 200 + 300"
+    if (!ex) return { sourceA: null, sourceBEntries: [] };
+    const detail = ex.uniqueRef || '';
+    const match = detail.match(/Source A ([\d.]+) vs Source B ([\d.]+) \+ ([\d.]+)/);
+    if (match) {
+      return {
+        sourceA: { ref: ex.ref, amount: parseFloat(match[1]) },
+        sourceBEntries: [
+          { ref: ex.ref, txnId: `${ex.ref}-B1`, amount: parseFloat(match[2]) },
+          { ref: ex.ref, txnId: `${ex.ref}-B2`, amount: parseFloat(match[3]) }
+        ]
+      };
+    }
+    // Fallback: just show what we have
+    return {
+      sourceA: { ref: ex.ref, amount: parseFloat(ex.amount) },
+      sourceBEntries: []
+    };
+  };
+
+  const handleOpenManualMatch = (ex) => {
+    setManualMatchEx(ex);
+    setShowManualMatchModal(true);
+  };
+
+  const handleConfirmManualMatch = async () => {
+    if (!manualMatchEx || isConfirmingManualMatch) return;
+    setIsConfirmingManualMatch(true);
+    try {
+      const remark = 'Manually matched 1 to 2';
+      const success = await updateExceptionStatus(manualMatchEx.id, 'Resolved', remark);
+      if (success) {
+        await logAudit(
+          'Manual Match Confirmed',
+          'Recon',
+          `User ${user?.name || user?.employeeId || 'Operator'} manually matched Partial Match exception ${manualMatchEx.id} (Ref: ${manualMatchEx.ref}) at ${new Date().toLocaleTimeString()}`,
+          'Activity'
+        );
+        addNotification({ title: 'Manual Match Complete', message: `Exception ${manualMatchEx.id} resolved as manually matched 1-to-2.` });
+        setShowManualMatchModal(false);
+        setManualMatchEx(null);
+        setSelectedEx(null);
+      } else {
+        addNotification({ title: 'Action Failed', message: 'Could not resolve exception. Please try again.', type: 'error' });
+      }
+    } catch (e) {
+      addNotification({ title: 'Error', message: e.message, type: 'error' });
+    } finally {
+      setIsConfirmingManualMatch(false);
     }
   };
 
@@ -347,7 +407,7 @@ const ExceptionQueue = () => {
             </div>
 
             {/* ── ACTION BUTTONS — at the top ── */}
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
               <button
                 onClick={handleApprove}
                 disabled={isActioning}
@@ -374,6 +434,21 @@ const ExceptionQueue = () => {
               >
                 <AlertTriangle size={15} /> Flag Error
               </button>
+              {selectedEx.type === 'Partial Match' && (
+                <button
+                  onClick={() => handleOpenManualMatch(selectedEx)}
+                  disabled={isActioning}
+                  style={{
+                    width: '100%', height: '42px', fontSize: '13px', fontWeight: '700',
+                    background: '#1D4ED8', color: 'white', border: 'none',
+                    borderRadius: '8px', cursor: isActioning ? 'not-allowed' : 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                    opacity: isActioning ? 0.7 : 1, transition: 'opacity 0.2s'
+                  }}
+                >
+                  <Zap size={15} /> Manual Match
+                </button>
+              )}
             </div>
 
             {/* Exception Detail Card */}
@@ -447,7 +522,6 @@ const ExceptionQueue = () => {
                 <X size={24} />
               </button>
             </div>
-            
             <div style={{ marginBottom: '24px' }}>
               <label style={{ display: 'block', fontSize: '13px', fontWeight: '700', color: '#475569', marginBottom: '8px' }}>Add Remarks</label>
               <textarea
@@ -458,23 +532,18 @@ const ExceptionQueue = () => {
                 style={{ height: '120px', resize: 'none', fontSize: '14px', paddingTop: '12px' }}
               />
               <p style={{ marginTop: '10px', fontSize: '12px', color: remarks.length < 10 ? '#EF4444' : '#10B981', fontWeight: '600' }}>
-                {remarks.length < 10 
+                {remarks.length < 10
                   ? `Remarks are required before proceeding (${10 - remarks.length} more characters needed)`
                   : 'Requirement met'
                 }
               </p>
             </div>
-
             <div style={{ display: 'flex', gap: '12px' }}>
-              <button 
-                className="btn btn-outline" 
-                onClick={() => setShowRemarksModal(false)}
-                style={{ flex: 1, height: '45px' }}
-              >
+              <button className="btn btn-outline" onClick={() => setShowRemarksModal(false)} style={{ flex: 1, height: '45px' }}>
                 Cancel
               </button>
-              <button 
-                className="btn btn-primary" 
+              <button
+                className="btn btn-primary"
                 disabled={remarks.length < 10 || isActioning}
                 onClick={handleConfirmAction}
                 style={{ flex: 2, height: '45px', opacity: (remarks.length < 10 || isActioning) ? 0.6 : 1 }}
@@ -485,6 +554,122 @@ const ExceptionQueue = () => {
           </div>
         </div>
       )}
+
+      {/* Manual Match Modal — Partial Match only */}
+      {showManualMatchModal && manualMatchEx && (() => {
+        const { sourceA, sourceBEntries } = parsePartialMatchDetail(manualMatchEx);
+        const totalB = sourceBEntries.reduce((s, e) => s + e.amount, 0);
+        const balanced = sourceA && Math.abs(totalB - sourceA.amount) < 0.001;
+        return (
+          <div style={{
+            position: 'fixed', top: 0, left: 0, width: '100%', height: '100%',
+            background: 'rgba(15, 23, 42, 0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+            zIndex: 1100, backdropFilter: 'blur(4px)'
+          }}>
+            <div className="card" style={{ width: '680px', maxWidth: '95vw', padding: '32px', boxShadow: '0 25px 50px -12px rgba(0,0,0,0.4)' }}>
+              {/* Modal Header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+                <div>
+                  <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#0F172A' }}>Manual Match Review</h3>
+                  <p style={{ fontSize: '13px', color: '#64748B', marginTop: '2px' }}>Exception #{manualMatchEx.id} — Partial Match</p>
+                </div>
+                <button onClick={() => { setShowManualMatchModal(false); setManualMatchEx(null); }} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94A3B8' }}>
+                  <X size={24} />
+                </button>
+              </div>
+
+              {/* Two-column comparison */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', marginBottom: '20px' }}>
+                {/* Source A */}
+                <div style={{ padding: '20px', background: '#F0F9FF', borderRadius: '12px', border: '1px solid #BAE6FD' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '900', color: '#0369A1', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Source A — Single Entry</div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>Reference No</span>
+                    <div style={{ fontSize: '14px', fontWeight: '800', color: '#0F172A' }}>{sourceA?.ref || manualMatchEx.ref}</div>
+                  </div>
+                  <div style={{ marginBottom: '8px' }}>
+                    <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>Transaction ID</span>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#0F172A' }}>{manualMatchEx.id}</div>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>Amount</span>
+                    <div style={{ fontSize: '22px', fontWeight: '900', color: '#0369A1' }}>₹{Number(sourceA?.amount || manualMatchEx.amount).toLocaleString('en-IN')}</div>
+                  </div>
+                </div>
+
+                {/* Source B */}
+                <div style={{ padding: '20px', background: '#FFF7ED', borderRadius: '12px', border: '1px solid #FFEDD5' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '900', color: '#C2410C', textTransform: 'uppercase', marginBottom: '12px', letterSpacing: '0.05em' }}>Source B — Split Entries</div>
+                  {sourceBEntries.length > 0 ? sourceBEntries.map((entry, i) => (
+                    <div key={i} style={{ marginBottom: '12px', paddingBottom: '12px', borderBottom: i < sourceBEntries.length - 1 ? '1px solid #FFEDD5' : 'none' }}>
+                      <div style={{ marginBottom: '4px' }}>
+                        <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>Reference No</span>
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>{entry.ref}</div>
+                      </div>
+                      <div style={{ marginBottom: '4px' }}>
+                        <span style={{ fontSize: '11px', color: '#64748B', fontWeight: '600' }}>Transaction ID</span>
+                        <div style={{ fontSize: '13px', fontWeight: '700', color: '#0F172A' }}>{entry.txnId}</div>
+                      </div>
+                      <div style={{ fontSize: '18px', fontWeight: '900', color: '#C2410C' }}>₹{Number(entry.amount).toLocaleString('en-IN')}</div>
+                    </div>
+                  )) : (
+                    <div style={{ color: '#94A3B8', fontSize: '13px' }}>No Source B breakdown available.</div>
+                  )}
+                  {/* Total */}
+                  <div style={{ marginTop: '8px', paddingTop: '10px', borderTop: '2px solid #FFEDD5', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontSize: '12px', fontWeight: '800', color: '#92400E' }}>TOTAL</span>
+                    <span style={{ fontSize: '18px', fontWeight: '900', color: '#92400E' }}>₹{Number(totalB).toLocaleString('en-IN')}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Balance Status */}
+              <div style={{
+                padding: '14px 18px', borderRadius: '10px', marginBottom: '24px',
+                background: balanced ? '#DCFCE7' : '#FEF2F2',
+                border: `1px solid ${balanced ? '#86EFAC' : '#FECACA'}`,
+                display: 'flex', alignItems: 'center', gap: '10px'
+              }}>
+                {balanced
+                  ? <CheckCircle size={18} color="#16A34A" />
+                  : <AlertTriangle size={18} color="#DC2626" />}
+                <span style={{ fontSize: '13px', fontWeight: '700', color: balanced ? '#166534' : '#991B1B' }}>
+                  {balanced
+                    ? 'Amounts balance — safe to match.'
+                    : `Amounts do not balance. Source A: ₹${Number(sourceA?.amount || 0).toLocaleString('en-IN')} vs Source B total: ₹${Number(totalB).toLocaleString('en-IN')}`
+                  }
+                </span>
+              </div>
+
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button
+                  className="btn btn-outline"
+                  onClick={() => { setShowManualMatchModal(false); setManualMatchEx(null); }}
+                  style={{ flex: 1, height: '46px' }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleConfirmManualMatch}
+                  disabled={!balanced || isConfirmingManualMatch}
+                  style={{
+                    flex: 2, height: '46px', fontSize: '14px', fontWeight: '800',
+                    background: balanced ? '#1D4ED8' : '#94A3B8',
+                    color: 'white', border: 'none', borderRadius: '8px',
+                    cursor: balanced && !isConfirmingManualMatch ? 'pointer' : 'not-allowed',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                    opacity: (!balanced || isConfirmingManualMatch) ? 0.6 : 1, transition: 'opacity 0.2s'
+                  }}
+                >
+                  {isConfirmingManualMatch ? <RefreshCw size={16} className="animate-spin" /> : <CheckCircle size={16} />}
+                  {isConfirmingManualMatch ? 'Processing...' : 'Confirm Manual Match'}
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
