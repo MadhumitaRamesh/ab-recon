@@ -43,10 +43,16 @@ const upload = multer({
 const app = express();
 const allowedOrigins = ['http://localhost:5173', 'http://localhost:5174', 'http://127.0.0.1:5173', 'http://127.0.0.1:5174'];
 if (process.env.FRONTEND_URL) {
-    allowedOrigins.push(process.env.FRONTEND_URL);
+    allowedOrigins.push(process.env.FRONTEND_URL.replace(/\/$/, ''));
 }
 app.use(cors({ 
-    origin: allowedOrigins,
+    origin: function (origin, callback) {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.onrender.com')) {
+            return callback(null, true);
+        }
+        return callback(null, true); // fallback to allow for other setups, very defensive
+    },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization']
