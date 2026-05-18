@@ -175,9 +175,9 @@ ON CONFLICT ON CONSTRAINT unique_perm DO NOTHING;
 
 -- 3. Users (Seeding default hashed password 'password123')
 INSERT INTO users (name, employee_id, role_name, status, password_hash) VALUES 
-('Aditya Birla', 'ABC001', 'Admin', 'Active', '$2b$10$tM2H9Z81.0m.pX91Vq.gG.Yg6d6s.k8g6d6s.k8g6d6s.k8g6d6s'),
-('Rajesh Kumar', 'ABC002', 'Ops_Maker', 'Active', '$2b$10$tM2H9Z81.0m.pX91Vq.gG.Yg6d6s.k8g6d6s.k8g6d6s.k8g6d6s'),
-('Sneha Sharma', 'ABC003', 'Ops_Checker', 'Active', '$2b$10$tM2H9Z81.0m.pX91Vq.gG.Yg6d6s.k8g6d6s.k8g6d6s.k8g6d6s')
+('Aditya Birla', 'ABC001', 'Admin', 'Active', '$2b$10$v8Y9X0BPen8id.Jwh3KLdOLtD0Oi61pgph6XYeTKg7FHnISSy75Hm'),
+('Rajesh Kumar', 'ABC002', 'Ops_Maker', 'Active', '$2b$10$v8Y9X0BPen8id.Jwh3KLdOLtD0Oi61pgph6XYeTKg7FHnISSy75Hm'),
+('Sneha Sharma', 'ABC003', 'Ops_Checker', 'Active', '$2b$10$v8Y9X0BPen8id.Jwh3KLdOLtD0Oi61pgph6XYeTKg7FHnISSy75Hm')
 ON CONFLICT (employee_id) DO NOTHING;
 
 -- 4. Recon Masters
