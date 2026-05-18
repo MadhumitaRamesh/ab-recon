@@ -147,6 +147,17 @@ const db = {
             }
         });
     },
+    getConnection(callback) {
+        this.pool.connect((err, client, done) => {
+            if (err) {
+                if (callback) callback(err);
+            } else {
+                const connection = new ConnectionWrapper(client);
+                connection.release = () => done();
+                if (callback) callback(null, connection);
+            }
+        });
+    },
     promise() {
         return new PromiseWrapper(this.pool);
     }

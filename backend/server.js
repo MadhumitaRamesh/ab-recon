@@ -1,5 +1,4 @@
 const express = require('express');
-const mysql = require('mysql2');
 const bcrypt = require('bcrypt');
 const cors = require('cors');
 const multer = require('multer');
@@ -99,9 +98,9 @@ const checkRole = (allowedRoles) => {
 
 db.getConnection((err, connection) => {
     if (err) {
-        console.error('CRITICAL: MySQL Connection Failed:', err.message);
+        console.error('CRITICAL: PostgreSQL Connection Failed:', err.message);
     } else {
-        console.log('SUCCESS: Connected to Aditya Birla Reconciliation Database (MySQL).');
+        console.log('SUCCESS: Connected to Aditya Birla Reconciliation Database (PostgreSQL).');
         connection.release();
         initScheduler(); // Start automated jobs
     }
