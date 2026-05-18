@@ -924,7 +924,7 @@ app.get('/api/recon-transactions/:batchId/summary', (req, res) => {
 
 app.get('/api/recon-transactions/:batchId/refund', (req, res) => {
     const { batchId } = req.params;
-    db.query('SELECT ref_no, amount, status FROM exceptions WHERE run_id = ? AND type = "Reversal"', [batchId], (err, results) => {
+    db.query("SELECT ref_no, amount, status FROM exceptions WHERE run_id = ? AND type = 'Reversal'", [batchId], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });
@@ -939,9 +939,9 @@ app.get('/api/recon-transactions/:batchId/transactions', (req, res) => {
             e.unique_reference_number,
             rr.amount,
             rr.result_type AS type,
-            COALESCE(e.type, rr.exception_type, IF(rr.result_type = 'Exception', 'Amount Mismatch', 'Matched')) AS exception_type,
+            COALESCE(e.type, rr.exception_type, CASE WHEN rr.result_type = 'Exception' THEN 'Amount Mismatch' ELSE 'Matched' END) AS exception_type,
             rr.status,
-            COALESCE(e.priority, IF(rr.result_type = 'Exception', 'High', 'Low')) AS priority
+            COALESCE(e.priority, CASE WHEN rr.result_type = 'Exception' THEN 'High' ELSE 'Low' END) AS priority
         FROM recon_results rr
         LEFT JOIN exceptions e ON e.run_id = rr.run_id AND e.ref_no = rr.reference_number
         WHERE rr.run_id = ?
@@ -955,7 +955,7 @@ app.get('/api/recon-transactions/:batchId/transactions', (req, res) => {
 
 app.get('/api/recon-transactions/:batchId/snr', (req, res) => {
     const { batchId } = req.params;
-    db.query('SELECT id, amount, ref_no, type FROM exceptions WHERE run_id = ? AND status IN ("Pending", "Under Review")', [batchId], (err, results) => {
+    db.query("SELECT id, amount, ref_no, type FROM exceptions WHERE run_id = ? AND status IN ('Pending', 'Under Review')", [batchId], (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
         res.json(results);
     });

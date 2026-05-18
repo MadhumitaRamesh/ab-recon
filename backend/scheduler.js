@@ -22,7 +22,7 @@ async function initScheduler() {
     console.log('[SCHEDULER] Initializing automated reconciliation jobs...');
 
     try {
-        const [masters] = await db.promise().query('SELECT * FROM masters WHERE status = "Active"');
+        const [masters] = await db.promise().query("SELECT * FROM masters WHERE status = 'Active'");
         
         masters.forEach(master => {
             const expression = getCronExpression(master.frequency);
