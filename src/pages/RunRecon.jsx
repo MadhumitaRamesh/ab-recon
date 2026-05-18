@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../context/AppContext';
+import { API_URL } from '../config';
 import { 
   Play, 
   Terminal, 
@@ -63,7 +64,7 @@ const RunRecon = () => {
         const saved = localStorage.getItem('ab_recon_user');
         const token = saved ? JSON.parse(saved).token : '';
         
-        const res = await fetch('http://127.0.0.1:5001/api/run-history', {
+        const res = await fetch(`${API_URL}/run-history`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
@@ -175,7 +176,7 @@ const RunRecon = () => {
       const savedUser = localStorage.getItem('ab_recon_user');
       const token = savedUser ? JSON.parse(savedUser).token : user?.token;
 
-      const res = await fetch(`http://127.0.0.1:5001/api/recon/parse-file`, {
+      const res = await fetch(`${API_URL}/recon/parse-file`, {
         method: 'POST',
         headers: {
           ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -210,7 +211,7 @@ const RunRecon = () => {
       };
 
       console.log('>>> TRIGGERING RECON RUN');
-      console.log('URL: http://127.0.0.1:5001/api/recon/trigger');
+      console.log(`URL: ${API_URL}/recon/trigger`);
       console.log('TOKEN:', token ? `Bearer ${token.substring(0, 10)}...` : 'NONE');
       console.log('BODY:', JSON.stringify({ masterId: selectedMaster.id, runDate, triggerType: selectedMaster.run_mode || 'Manual', manualData: payload }));
 
@@ -270,7 +271,7 @@ const RunRecon = () => {
             const savedUser = localStorage.getItem('ab_recon_user');
             const token = savedUser ? JSON.parse(savedUser).token : user?.token;
             
-            let url = `http://127.0.0.1:5001/api/run-history?startDate=${startDateFilter}&endDate=${endDateFilter}`;
+            let url = `${API_URL}/run-history?startDate=${startDateFilter}&endDate=${endDateFilter}`;
             const res = await fetch(url, {
                 headers: {
                     ...(token ? { 'Authorization': `Bearer ${token}` } : {})
@@ -369,7 +370,7 @@ const RunRecon = () => {
                           </label>
                           {source.sampleTemplate && (
                             <a 
-                              href={`http://127.0.0.1:5001/api/recon-masters/${selectedMaster.id}/sample-file/${source.name}`}
+                              href={`${API_URL}/recon-masters/${selectedMaster.id}/sample-file/${source.name}`}
                               download
                               style={{ fontSize: '10px', color: '#64748B', textDecoration: 'underline', fontWeight: '700' }}
                             >

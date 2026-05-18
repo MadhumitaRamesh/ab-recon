@@ -1,7 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { API_URL } from '../config';
 
 const AppContext = createContext();
-const API_URL = 'http://127.0.0.1:5001/api';
 
 export const AppProvider = ({ children }) => {
   const [user, setUser] = useState(null);

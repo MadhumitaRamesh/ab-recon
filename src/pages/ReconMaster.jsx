@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
+import { API_URL } from '../config';
 import { Plus, Database, Settings2, Edit3, Trash2, X, Info, Layers, Zap, Globe, Server, UserCheck } from 'lucide-react';
 
 const ReconMaster = () => {
@@ -175,7 +176,7 @@ const ReconMaster = () => {
                                 formData.append('file', file);
                                 formData.append('sourceLabel', source.name);
                                 try {
-                                  const res = await fetch(`http://127.0.0.1:5001/api/recon-masters/${editingMaster.id}/sample-file`, {
+                                  const res = await fetch(`${API_URL}/recon-masters/${editingMaster.id}/sample-file`, {
                                     method: 'POST',
                                     body: formData
                                   });

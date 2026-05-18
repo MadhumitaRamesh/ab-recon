@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useApp } from '../context/AppContext';
+import { API_URL } from '../config';
 import { 
   Search, 
   ChevronRight, 
@@ -39,7 +40,6 @@ const ReconciliationTransactions = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
-  const API_URL = 'http://127.0.0.1:5001/api';
 
   useEffect(() => {
     fetch(`${API_URL}/masters`)

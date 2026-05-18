@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useApp } from '../context/AppContext';
+import { API_URL } from '../config';
 import { 
   Zap, 
   X, 
@@ -79,7 +80,7 @@ const ExceptionQueue = () => {
         const saved = localStorage.getItem('ab_recon_user');
         const token = saved ? JSON.parse(saved).token : '';
         
-        const res = await fetch('http://127.0.0.1:5001/api/exceptions', {
+        const res = await fetch(`${API_URL}/exceptions`, {
           headers: {
             'Authorization': `Bearer ${token}`,
             'Content-Type': 'application/json'
