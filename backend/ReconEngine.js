@@ -86,7 +86,7 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
                 const targetDate = parseToDate(runDate);
                 const dateFilteredRows = dateKey
                     ? allRows.filter(row => {
-                        const rowDate = parseToDate(row[dateKey]);
+                        const rowDate = parseToDate(row.transaction_date);
                         if (!targetDate || !rowDate) return false;
                         return rowDate.getFullYear() === targetDate.getFullYear() &&
                                rowDate.getMonth() === targetDate.getMonth() &&
