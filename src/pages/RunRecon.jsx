@@ -57,31 +57,6 @@ const RunRecon = () => {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // On mount: fetch ALL run history from DB using direct fetch pattern for reliability
-  useEffect(() => {
-    const fetchHistory = async () => {
-      try {
-        const saved = localStorage.getItem('ab_recon_user');
-        const token = saved ? JSON.parse(saved).token : '';
-        
-        const res = await fetch(`${API_URL}/run-history`, {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        });
-        if (!res.ok) throw new Error('Failed to fetch');
-        const data = await res.json();
-        // Since we are in RunRecon, we should ideally use the context's setRunHistory
-        // but for this direct pattern we assume we just want to ensure it works
-        setRunHistory(Array.isArray(data) ? data.map(normalizeRunHistory) : []);
-      } catch (err) {
-        console.error('Run history fetch error:', err);
-        setRunHistory([]);
-      }
-    };
-    fetchHistory();
-  }, []);
 
 
   // Re-fetch when filter controls change (user-applied filters)

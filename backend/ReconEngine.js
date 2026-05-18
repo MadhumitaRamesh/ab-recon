@@ -333,7 +333,7 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
         await connection.query(
             'INSERT INTO audit_logs (user_name, action, module, detail, log_time, log_date, type, forensic_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             ['System', 'Recon Completed', masterConfig.name, `Batch ${runId} finalized. Matched: ${matchedCount}, Exceptions: ${exceptionCount}`, 
-             endTime.toLocaleTimeString('en-GB', { hour12: false }), runDate, 'Activity', `SUCCESS_${runId}`]
+             endTime.split(' ')[1], runDate, 'Activity', `SUCCESS_${runId}`]
         );
 
         await connection.commit();
