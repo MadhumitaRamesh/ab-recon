@@ -389,7 +389,25 @@ const ExceptionQueue = () => {
                   >
                     <td style={{ fontSize: '12px', fontWeight: '700', color: '#64748B' }}>#{ex.id}</td>
                     <td style={{ fontWeight: '700', color: '#0F172A' }}>{ex.product || '—'}</td>
-                    <td style={{ fontSize: '13px', color: '#475569' }}>{ex.type || '—'}</td>
+                    <td style={{ fontSize: '13px', color: '#475569' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                        <span>{ex.type || '—'}</span>
+                        {ex.carryForward && (
+                          <span style={{
+                            background: '#FEE2E2',
+                            color: '#991B1B',
+                            border: '1px solid #FCA5A5',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            fontSize: '10px',
+                            fontWeight: '700',
+                            textTransform: 'uppercase'
+                          }}>
+                            Carry Forward ({ex.runDate})
+                          </span>
+                        )}
+                      </div>
+                    </td>
                     <td style={{ fontSize: '13px' }}>{ex.uniqueRef || ex.ref || '—'}</td>
                     <td style={{ fontWeight: '800', color: '#0F172A' }}>₹{ex.amount}</td>
                     <td>

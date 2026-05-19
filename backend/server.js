@@ -366,7 +366,10 @@ app.get('/api/exceptions', (req, res) => {
 
     if (runId) { sql += ' AND e.run_id = ?'; params.push(runId); }
     if (masterId) { sql += ' AND e.recon_master_id = ?'; params.push(masterId); }
-    if (date) { sql += ' AND e.run_date = ?'; params.push(date); }
+    if (date) { 
+        sql += " AND (e.run_date = ? OR (e.status NOT IN ('Resolved', 'Closed') AND e.run_date < ?))"; 
+        params.push(date, date); 
+    }
     if (master && master !== 'All Products') { sql += ' AND m.name = ?'; params.push(master); }
     if (type && type !== 'All Types') { sql += ' AND e.type = ?'; params.push(type); }
     if (priority && priority !== 'All Priorities') { sql += ' AND e.priority = ?'; params.push(priority); }
@@ -376,7 +379,20 @@ app.get('/api/exceptions', (req, res) => {
 
     db.query(sql, params, (err, results) => {
         if (err) return res.status(500).json({ error: err.message });
-        res.json(results);
+        
+        const mapped = results.map(e => {
+            let isCarryForward = false;
+            const refDate = date || new Date(new Date().getTime() + (5.5 * 60 * 60 * 1000)).toISOString().split('T')[0];
+            const eDate = e.run_date ? (typeof e.run_date === 'string' ? e.run_date.split('T')[0] : e.run_date.toISOString().split('T')[0]) : null;
+            if (eDate && eDate < refDate && !['Resolved', 'Closed'].includes(e.status)) {
+                isCarryForward = true;
+            }
+            return {
+                ...e,
+                carry_forward: isCarryForward ? 1 : 0
+            };
+        });
+        res.json(mapped);
     });
 });
 

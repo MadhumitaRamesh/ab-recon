@@ -330,6 +330,61 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
             }
         }
 
+        // --- CARRY FORWARD AUTO-RESOLUTION STEP ---
+        try {
+            console.log(`[ENGINE] Starting carry forward exception check for runDate: ${runDate}`);
+            
+            // Fetch all unresolved exceptions for this master from previous run dates
+            const [openExceptions] = await connection.query(
+                "SELECT * FROM exceptions WHERE recon_master_id = ? AND status NOT IN ('Resolved', 'Closed') AND run_date < ?",
+                [masterConfig.id, runDate]
+            );
+            
+            console.log(`[ENGINE] Found ${openExceptions.length} unresolved carry forward exceptions to check.`);
+            
+            for (const ex of openExceptions) {
+                // Check if today's Source A or Source B has a matching entry for this exception's reference number & amount
+                const matchA = sourceA.find(row => 
+                    row.reference_number === ex.ref_no && 
+                    Math.abs(Number(row.amount) - Number(ex.amount)) < 0.001
+                );
+                const matchB = sourceB.find(row => 
+                    row.reference_number === ex.ref_no && 
+                    Math.abs(Number(row.amount) - Number(ex.amount)) < 0.001
+                );
+
+                if (matchA || matchB) {
+                    console.log(`[ENGINE] Auto-resolving carry forward exception ${ex.id} (Ref: ${ex.ref_no}, Amount: ${ex.amount})`);
+                    
+                    // Update exception status to Resolved
+                    await connection.query(
+                        "UPDATE exceptions SET status = 'Resolved', remarks = ? WHERE id = ?",
+                        [`automatically matched in subsequent run on ${runDate}`, ex.id]
+                    );
+
+                    // Log audit entry
+                    const nowIST = getISTTime();
+                    const logTime = nowIST.split(' ')[1];
+                    await connection.query(
+                        'INSERT INTO audit_logs (user_name, action, module, detail, log_time, log_date, type, forensic_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                        [
+                            'System', 
+                            'Carry Forward Resolved', 
+                            masterConfig.name, 
+                            `System automatically resolved carry forward exception ${ex.id} (Ref: ${ex.ref_no}, Amount: ${ex.amount})`, 
+                            logTime, 
+                            runDate, 
+                            'Activity', 
+                            `AUTO_RESOLVE_${ex.id}_${runId}`
+                        ]
+                    );
+                }
+            }
+        } catch (carryForwardError) {
+            console.error('[ENGINE] Error during carry forward exception check:', carryForwardError.message);
+            throw carryForwardError;
+        }
+
         await connection.query(
             'INSERT INTO audit_logs (user_name, action, module, detail, log_time, log_date, type, forensic_hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
             ['System', 'Recon Completed', masterConfig.name, `Batch ${runId} finalized. Matched: ${matchedCount}, Exceptions: ${exceptionCount}`, 

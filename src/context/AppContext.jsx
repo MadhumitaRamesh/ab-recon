@@ -116,6 +116,7 @@ export const AppProvider = ({ children }) => {
       ref: e.ref_no, type: e.type, age: e.age || '0 days', priority: e.priority, status: e.status,
       masterId: e.recon_master_id, product: e.product_name || 'Unknown', runId: e.run_id,
       runDate: datePart ? new Date(datePart).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '--',
+      carryForward: e.carry_forward === 1 || e.carry_forward === true || e.carry_forward === '1',
       sourceType: e.source_type, uniqueRef: e.unique_reference_number, assignedRole: e.assigned_role || 'Operations',
       remarks: e.remarks || ''
     };
