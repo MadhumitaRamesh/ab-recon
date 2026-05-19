@@ -68,10 +68,36 @@ const ReconciliationTransactions = () => {
   }, [selectedMaster, activeTab, startDate, endDate]);
 
   useEffect(() => {
-    if (level === 2) fetchTransactions();
-  }, [level, fetchTransactions]);
+    if (level === 2) {
+      fetchTransactions();
+      fetchMasterExceptions();
+    }
+  }, [level, fetchTransactions, fetchMasterExceptions]);
 
   const [exceptionsData, setExceptionsData] = useState([]);
+  const [masterExceptions, setMasterExceptions] = useState([]);
+
+  // Fetch all exceptions for the selected master (used for carry-forward detection)
+  const fetchMasterExceptions = useCallback(async () => {
+    if (!selectedMaster) return;
+    try {
+      const res = await fetch(`${API_URL}/exceptions?masterId=${selectedMaster.id}`);
+      const data = await res.json();
+      setMasterExceptions(Array.isArray(data) ? data : []);
+    } catch (err) {
+      console.error('Failed to fetch master exceptions for carry-forward check:', err);
+    }
+  }, [selectedMaster]);
+
+  // Helper: count unresolved carry-forward exceptions before a given run date
+  const getCarryForwardCount = useCallback((runDate) => {
+    return masterExceptions.filter(ex => {
+      const exDate = ex.run_date
+        ? (typeof ex.run_date === 'string' ? ex.run_date.split('T')[0] : '')
+        : '';
+      return exDate && exDate < runDate && !['Resolved', 'Closed'].includes(ex.status);
+    }).length;
+  }, [masterExceptions]);
 
   const fetchDetailSubData = async (batchId) => {
     setLoadingDetail(true);
@@ -255,17 +281,34 @@ const ReconciliationTransactions = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {reconData.map(item => (
-                    <tr key={item.batch_id} onClick={() => { setSelectedRecord(item); setLevel(3); setDetailTab('Overview'); }} style={{ cursor: 'pointer' }} className="hover-scale">
-                      <td style={{ fontSize: '13px', color: '#64748B' }}>{item.transaction_date}</td>
-                      <td style={{ fontWeight: '800', color: '#1E293B' }}>{item.recon_id}</td>
-                      <td style={{ textAlign: 'right', fontWeight: '700', color: '#059669' }}>{item.transaction_amount}</td>
-                      <td style={{ textAlign: 'right', fontWeight: '800' }}>{item.claim_amount}</td>
-                      <td style={{ textAlign: 'right', fontWeight: '700', color: '#DC2626' }}>{item.snr_amount}</td>
-                      <td><span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', background: item.recon_status === 'Completed' ? '#ECFDF5' : '#FEF2F2', color: item.recon_status === 'Completed' ? '#059669' : '#DC2626' }}>{item.recon_status}</span></td>
-                      <td><span style={{ fontWeight: '800', color: getStatusColor(item.settlement_status) }}>{item.settlement_status}</span></td>
-                    </tr>
-                  ))}
+                  {reconData.map(item => {
+                    const cfCount = Number(item.snr_amount) === 0
+                      ? getCarryForwardCount(item.transaction_date)
+                      : 0;
+                    return (
+                      <React.Fragment key={item.batch_id}>
+                        <tr onClick={() => { setSelectedRecord(item); setLevel(3); setDetailTab('Overview'); }} style={{ cursor: 'pointer' }} className="hover-scale">
+                          <td style={{ fontSize: '13px', color: '#64748B' }}>{item.transaction_date}</td>
+                          <td style={{ fontWeight: '800', color: '#1E293B' }}>{item.recon_id}</td>
+                          <td style={{ textAlign: 'right', fontWeight: '700', color: '#059669' }}>{item.transaction_amount}</td>
+                          <td style={{ textAlign: 'right', fontWeight: '800' }}>{item.claim_amount}</td>
+                          <td style={{ textAlign: 'right', fontWeight: '700', color: '#DC2626' }}>{item.snr_amount}</td>
+                          <td><span style={{ padding: '4px 10px', borderRadius: '20px', fontSize: '11px', fontWeight: '800', background: item.recon_status === 'Completed' ? '#ECFDF5' : '#FEF2F2', color: item.recon_status === 'Completed' ? '#059669' : '#DC2626' }}>{item.recon_status}</span></td>
+                          <td><span style={{ fontWeight: '800', color: getStatusColor(item.settlement_status) }}>{item.settlement_status}</span></td>
+                        </tr>
+                        {cfCount > 0 && (
+                          <tr>
+                            <td colSpan={7} style={{ padding: '4px 16px 8px 32px', background: '#FFFBEB', borderBottom: '1px solid #FDE68A' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#92400E', fontWeight: '600' }}>
+                                <span style={{ fontSize: '14px' }}>ℹ</span>
+                                {cfCount} unresolved carry forward exception{cfCount !== 1 ? 's' : ''} from previous runs of this master
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
                 </tbody>
               </table>
               <div style={{ padding: '16px 24px', background: '#F8FAFC', borderTop: '1px solid #F1F5F9', fontSize: '12px', color: '#64748B', fontWeight: '600' }}>
@@ -375,13 +418,29 @@ const ReconciliationTransactions = () => {
                           <td style={{ fontSize: '12px', color: '#64748B' }}>{row.unique_reference_number || 'N/A'}</td>
                           <td style={{ fontWeight: '800' }}>₹{Number(row.amount || 0).toLocaleString('en-IN')}</td>
                           <td>
-                            <span style={{ 
-                              padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700',
-                              background: row.type === 'Matched' ? '#ECFDF5' : '#FEF2F2',
-                              color: row.type === 'Matched' ? '#059669' : '#DC2626'
-                            }}>
-                              {row.type === 'Matched' ? 'Matched' : (row.exception_type || 'Exception')}
-                            </span>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                              <span style={{ 
+                                padding: '4px 8px', borderRadius: '6px', fontSize: '11px', fontWeight: '700',
+                                background: row.type === 'Matched' ? '#ECFDF5' : '#FEF2F2',
+                                color: row.type === 'Matched' ? '#059669' : '#DC2626'
+                              }}>
+                                {row.type === 'Matched' ? 'Matched' : (row.exception_type || 'Exception')}
+                              </span>
+                              {row.exception_type && row.status === 'Open' && (
+                                <span style={{
+                                  background: '#FEE2E2',
+                                  color: '#991B1B',
+                                  border: '1px solid #FCA5A5',
+                                  padding: '2px 6px',
+                                  borderRadius: '4px',
+                                  fontSize: '10px',
+                                  fontWeight: '700',
+                                  textTransform: 'uppercase'
+                                }}>
+                                  Carry Forward ({selectedRecord?.transaction_date || selectedRecord?.date})
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td><span style={{ fontWeight: '800', color: getStatusColor(row.status) }}>{row.status}</span></td>
                           <td><span style={{ color: row.priority === 'High' ? '#DC2626' : '#059669', fontWeight: '700' }}>{row.priority || (row.type === 'Matched' ? 'Low' : 'High')}</span></td>

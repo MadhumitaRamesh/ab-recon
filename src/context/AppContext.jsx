@@ -262,12 +262,21 @@ export const AppProvider = ({ children }) => {
     return false;
   };
 
-  const updateExceptionStatus = async (id, status) => {
+  const updateExceptionStatus = async (id, status, remarks = '') => {
     const data = await secureFetch(`${API_URL}/exceptions/${id}`, {
       method: 'PUT',
-      body: JSON.stringify({ status })
+      body: JSON.stringify({ status, remarks })
     });
-    if (data) { fetchAll(); return true; }
+    if (data) { 
+      fetchAll(); 
+      logAudit(
+        status === 'Resolved' ? 'Exception Resolved' : 'Exception Flagged',
+        'Recon',
+        `Exception ID: ${id} manually marked as "${status}". Remarks: ${remarks}`,
+        'Activity'
+      );
+      return true; 
+    }
     return false;
   };
 
