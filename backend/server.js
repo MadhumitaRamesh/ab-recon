@@ -5,6 +5,7 @@ const multer = require('multer');
 const path = require('path');
 const XLSX = require('xlsx');
 const fs = require('fs');
+const os = require('os');
 require('dotenv').config();
 
 // Ensure templates directory exists
@@ -533,22 +534,44 @@ app.get('/api/recon-results/:runId', (req, res) => {
     });
 });
 
-const tempUpload = multer({ dest: 'uploads/temp/' });
+// Use OS temp directory so it works on Render (ephemeral filesystem)
+const tempUploadDir = path.join(os.tmpdir(), 'ab-recon-uploads');
+if (!fs.existsSync(tempUploadDir)) {
+    fs.mkdirSync(tempUploadDir, { recursive: true });
+}
+const tempUpload = multer({ dest: tempUploadDir });
 app.post('/api/recon/parse-file', tempUpload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded.' });
 
+    const filePath = req.file.path;
+    console.log(`[PARSE-FILE] Received file: ${req.file.originalname} | Saved to: ${filePath} | Size: ${req.file.size} bytes`);
+
     try {
-        const workbook = XLSX.readFile(req.file.path);
+        // Verify file exists before parsing
+        if (!fs.existsSync(filePath)) {
+            console.error(`[PARSE-FILE] ERROR: File not found at path: ${filePath}`);
+            return res.status(500).json({ error: `Uploaded file not found at ${filePath}` });
+        }
+
+        const workbook = XLSX.readFile(filePath);
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
         const data = XLSX.utils.sheet_to_json(worksheet);
-        fs.unlinkSync(req.file.path);
+
+        // Clean up temp file
+        try { fs.unlinkSync(filePath); } catch (unlinkErr) {
+            console.warn(`[PARSE-FILE] Warning: Could not delete temp file ${filePath}:`, unlinkErr.message);
+        }
+
+        console.log(`[PARSE-FILE] Parsed ${data.length} rows from ${req.file.originalname}`);
         res.json({ 
             headers: data.length > 0 ? Object.keys(data[0]) : [],
             rows: data,
             rowCount: data.length
         });
     } catch (err) {
+        console.error(`[PARSE-FILE] ERROR parsing file ${req.file.originalname}:`, err.message);
+        console.error(`[PARSE-FILE] Stack:`, err.stack);
         res.status(500).json({ error: 'Failed to parse file: ' + err.message });
     }
 });
@@ -604,7 +627,8 @@ app.post('/api/recon/trigger', async (req, res) => {
         console.log(`[API] Recon Success | Run ID: ${result.runId}`);
         res.json(result);
     } catch (err) {
-        console.error(`[API] Recon Trigger Error:`, err.message);
+        console.error(`[API] Recon Trigger Error - Message:`, err.message);
+        console.error(`[API] Recon Trigger Error - Stack:`, err.stack);
         res.status(500).json({ error: err.message });
     }
 });

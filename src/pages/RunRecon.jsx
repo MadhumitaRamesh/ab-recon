@@ -59,6 +59,11 @@ const RunRecon = () => {
 
 
 
+  // Load ALL run history on mount — no date filter so nothing is hidden
+  useEffect(() => {
+    fetchFilteredHistory({});
+  }, []);
+
   // Re-fetch when filter controls change (user-applied filters)
   useEffect(() => {
     fetchFilteredHistory({
@@ -193,13 +198,8 @@ const RunRecon = () => {
       const result = await triggerReconRun(selectedMaster.id, runDate, selectedMaster.run_mode || 'Manual', payload);
       addNotification({ title: 'Success', message: `Run ${result.runId} completed.` });
       
-      // Refresh history and trigger dashboard update
-      fetchFilteredHistory({
-        date: filterDate,
-        master: filterProduct,
-        status: filterStatus,
-        triggerType: filterTrigger
-      });
+      // Refresh history — fetch ALL runs (no date filter) so the new run is always visible
+      await fetchFilteredHistory({});
       setRefreshTrigger(prev => prev + 1);
 
       setIsSubmitting(false);
