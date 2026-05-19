@@ -555,17 +555,40 @@ app.post('/api/recon/parse-file', tempUpload.single('file'), (req, res) => {
 
         const workbook = XLSX.readFile(filePath);
         const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(worksheet);
+        const sheet = workbook.Sheets[sheetName];
+
+        // Use header:1 so XLSX returns raw arrays — first row becomes our headers
+        const rawRows = XLSX.utils.sheet_to_json(sheet, {
+            header: 1,
+            defval: '',
+            blankrows: false
+        });
+
+        if (!rawRows || rawRows.length === 0) {
+            return res.status(400).json({ error: 'File appears to be empty.' });
+        }
+
+        // First row is headers — trim whitespace from each header name
+        const headers = rawRows[0].map(h => String(h).trim());
+        console.log(`[PARSE-FILE] Headers found in "${req.file.originalname}": [${headers.join(', ')}]`);
+
+        // Remaining rows become data objects keyed by header names
+        const data = rawRows.slice(1).map(row => {
+            const obj = {};
+            headers.forEach((h, i) => {
+                obj[h] = row[i] !== undefined ? row[i] : '';
+            });
+            return obj;
+        }).filter(row => Object.values(row).some(v => v !== ''));
 
         // Clean up temp file
         try { fs.unlinkSync(filePath); } catch (unlinkErr) {
             console.warn(`[PARSE-FILE] Warning: Could not delete temp file ${filePath}:`, unlinkErr.message);
         }
 
-        console.log(`[PARSE-FILE] Parsed ${data.length} rows from ${req.file.originalname}`);
+        console.log(`[PARSE-FILE] Parsed ${data.length} data rows from "${req.file.originalname}"`);
         res.json({ 
-            headers: data.length > 0 ? Object.keys(data[0]) : [],
+            headers,
             rows: data,
             rowCount: data.length
         });

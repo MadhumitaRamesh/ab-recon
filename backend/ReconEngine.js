@@ -42,20 +42,35 @@ async function runReconciliation(masterConfig, runDate, triggerType, manualData 
                 }
 
                 const firstRow = provided[0];
-                // Auto-detect reference and amount columns (case-insensitive fallback)
+                console.log(`[ENGINE] ${sourceLabel} - Columns received: [${Object.keys(firstRow).join(', ')}]`);
+
+                // Known aliases for each column type
+                const REF_ALIASES = ['Reference No', 'Reference No.', 'Ref No', 'REF_NO', 'reference_no', 'ReferenceNo', 'Ref_No', 'ref_no'];
+                const AMT_ALIASES = ['Amount', 'Amount (₹)', 'amount', 'AMOUNT', 'Amt', 'amt'];
+                const DATE_ALIASES = ['Transaction Date', 'Date', 'date', 'DATE', 'transaction_date', 'TransactionDate', 'Txn Date', 'txn_date'];
+
+                // Helper: find first matching key from aliases list, then fallback to regex
+                const findKey = (row, aliases, fallbackRegex) => {
+                    for (const alias of aliases) {
+                        if (alias in row) return alias;
+                    }
+                    return Object.keys(row).find(k => fallbackRegex.test(k)) || null;
+                };
+
+                // Auto-detect reference and amount columns
                 const refKey = mapping.reference in firstRow ? mapping.reference
-                    : Object.keys(firstRow).find(k => /ref/i.test(k) || /reference/i.test(k)) || mapping.reference;
+                    : findKey(firstRow, REF_ALIASES, /ref/i) || mapping.reference;
                 const amtKey = mapping.amount in firstRow ? mapping.amount
-                    : Object.keys(firstRow).find(k => /amount/i.test(k) || /amt/i.test(k)) || mapping.amount;
+                    : findKey(firstRow, AMT_ALIASES, /amount|amt/i) || mapping.amount;
+
+                console.log(`[ENGINE] ${sourceLabel} - Using refKey="${refKey}", amtKey="${amtKey}"`);
 
                 if (!(refKey in firstRow) || !(amtKey in firstRow)) {
                     throw new Error(`Column Mapping Error in ${sourceLabel}: Could not find reference/amount columns. Found: [${Object.keys(firstRow).join(', ')}]`);
                 }
 
-                // Auto-detect the date column name case-insensitively
-                const dateKey = Object.keys(firstRow).find(k =>
-                    /^(transaction[_\s]?date|date|txn[_\s]?date)$/i.test(k)
-                ) || null;
+                // Auto-detect the date column name
+                const dateKey = findKey(firstRow, DATE_ALIASES, /^(transaction[_\s]?date|date|txn[_\s]?date)$/i);
 
                 const allRows = provided.map(row => ({
                     amount: parseFloat(row[amtKey]) || 0,
