@@ -67,13 +67,6 @@ const ReconciliationTransactions = () => {
     }
   }, [selectedMaster, activeTab, startDate, endDate]);
 
-  useEffect(() => {
-    if (level === 2) {
-      fetchTransactions();
-      fetchMasterExceptions();
-    }
-  }, [level, fetchTransactions, fetchMasterExceptions]);
-
   const [exceptionsData, setExceptionsData] = useState([]);
   const [masterExceptions, setMasterExceptions] = useState([]);
 
@@ -98,6 +91,13 @@ const ReconciliationTransactions = () => {
       return exDate && exDate < runDate && !['Resolved', 'Closed'].includes(ex.status);
     }).length;
   }, [masterExceptions]);
+
+  useEffect(() => {
+    if (level === 2) {
+      fetchTransactions();
+      fetchMasterExceptions();
+    }
+  }, [level, fetchTransactions, fetchMasterExceptions]);
 
   const fetchDetailSubData = async (batchId) => {
     setLoadingDetail(true);
