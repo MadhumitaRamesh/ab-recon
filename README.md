@@ -64,4 +64,4 @@ Every significant action within the platform is recorded for forensic purposes:
 3. Start the development server: `npm run dev`
 
 ## Database Configuration
-For detailed instructions on initializing the MySQL schema and seeding initial data, please refer to the `DATABASE_SETUP.md` file included in this repository.
+For detailed instructions on initializing the MySQL schema and seeding initial data, please refer to the `DATABASE_SETUP.md` file included in this repository
